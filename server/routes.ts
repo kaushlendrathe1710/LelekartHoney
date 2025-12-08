@@ -1751,7 +1751,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/orders/:id/shipping-label", async (req, res) => {
     // Temporarily bypass authentication for testing
-    // if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
       const orderId = parseInt(req.params.id);

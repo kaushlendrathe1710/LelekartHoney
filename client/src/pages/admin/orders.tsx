@@ -991,9 +991,7 @@ export default function AdminOrders() {
                               onClick={() => {
                                 fetchOrderDetails(order.id);
                                 setTimeout(() => {
-                                  if (shippingLabelRef.current) {
-                                    printShippingLabel();
-                                  }
+                                  downloadShippingLabel();
                                 }, 1000);
                               }}
                             >
@@ -1291,9 +1289,7 @@ export default function AdminOrders() {
                   <Button
                     variant="outline"
                     onClick={() => {
-                      if (shippingLabelRef.current) {
-                        printShippingLabel();
-                      }
+                      downloadShippingLabel();
                     }}
                   >
                     <Truck className="mr-2 h-4 w-4" />
