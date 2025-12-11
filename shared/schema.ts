@@ -93,8 +93,8 @@ export const products = pgTable("products", {
   purchasePrice: integer("purchase_price"), // Purchase Price (cost price)
   price: integer("price").notNull(),
   category: text("category").notNull(),
-  categoryId: integer("category_id").references(() => categories.id), // Reference to categories table
-  subcategoryId: integer("subcategory_id").references(() => subcategories.id), // Reference to subcategories table
+  categoryId: integer("category_id"), // Reference to categories table (FK removed due to forward reference)
+  subcategoryId: integer("subcategory_id"), // Reference to subcategories table (FK removed due to forward reference)
   subcategory1: text("subcategory1"), // Free text subcategory 1
   subcategory2: text("subcategory2"), // Free text subcategory 2
   color: text("color"), // Product color
@@ -213,7 +213,7 @@ export const orders = pgTable("orders", {
   paymentMethod: text("payment_method").notNull().default("cod"),
   paymentId: text("payment_id"), // For Razorpay paymentId
   orderId: text("order_id"), // For Razorpay orderId
-  addressId: integer("address_id").references(() => userAddresses.id), // Optional reference to saved address
+  addressId: integer("address_id"), // Optional reference to saved address (FK removed due to forward reference)
 
   // Wallet integration fields
   walletDiscount: integer("wallet_discount").default(0), // Amount discounted using wallet coins
@@ -336,10 +336,10 @@ export const usersRelations = relations(users, ({ many }) => ({
   products: many(products),
   carts: many(carts),
   orders: many(orders),
-  reviews: many(reviews),
-  reviewHelpfulVotes: many(reviewHelpful),
-  wishlists: many(wishlists),
-  mediaItems: many(mediaLibrary),
+  reviews: many(() => reviews),
+  reviewHelpfulVotes: many(() => reviewHelpful),
+  wishlists: many(() => wishlists),
+  mediaItems: many(() => mediaLibrary),
 }));
 
 export const productsRelations = relations(products, ({ one, many }) => ({
@@ -347,18 +347,18 @@ export const productsRelations = relations(products, ({ one, many }) => ({
     fields: [products.sellerId],
     references: [users.id],
   }),
-  category: one(categories, {
+  category: one(() => categories, {
     fields: [products.categoryId],
     references: [categories.id],
   }),
-  subcategory: one(subcategories, {
+  subcategory: one(() => subcategories, {
     fields: [products.subcategoryId],
     references: [subcategories.id],
   }),
   cartItems: many(carts),
   orderItems: many(orderItems),
-  reviews: many(reviews),
-  wishlists: many(wishlists),
+  reviews: many(() => reviews),
+  wishlists: many(() => wishlists),
   variants: many(productVariants),
 }));
 
@@ -392,13 +392,13 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     fields: [orders.userId],
     references: [users.id],
   }),
-  address: one(userAddresses, {
+  address: one(() => userAddresses, {
     fields: [orders.addressId],
     references: [userAddresses.id],
   }),
   items: many(orderItems),
   sellerOrders: many(sellerOrders),
-  reviews: many(reviews),
+  reviews: many(() => reviews),
 }));
 
 export const sellerOrdersRelations = relations(
@@ -472,31 +472,27 @@ export const insertCategorySchema = createInsertSchema(categories).pick({
   gstRate: true,
 });
 
-// Subcategories table (function expression to allow self-reference)
-export const subcategories = pgTable("subcategories", (table) => {
-  return {
-    id: serial("id").primaryKey(),
-    name: text("name").notNull(),
-    slug: text("slug").notNull(), // New: URL-friendly identifier
-    image: text("image"),
-    description: text("description"),
-    categoryId: integer("category_id")
-      .notNull()
-      .references(() => categories.id, { onDelete: "cascade" }),
-    parentId: integer("parent_id").references(() => (table as any).id, {
-      onDelete: "cascade",
-    }),
-    displayOrder: integer("display_order").notNull().default(0),
-    active: boolean("active").notNull().default(true),
-    featured: boolean("featured").notNull().default(false), // New: Featured flag for promotional subcategories
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  };
+// Subcategories table (with self-reference for parent)
+export const subcategories = pgTable("subcategories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull(), // New: URL-friendly identifier
+  image: text("image"),
+  description: text("description"),
+  categoryId: integer("category_id")
+    .notNull()
+    .references(() => categories.id, { onDelete: "cascade" }),
+  parentId: integer("parent_id"),
+  displayOrder: integer("display_order").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  featured: boolean("featured").notNull().default(false), // New: Featured flag for promotional subcategories
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // Define category to subcategory relationship
 export const categoriesRelations = relations(categories, ({ many }) => ({
-  subcategories: many(subcategories),
+  subcategories: many(() => subcategories),
 }));
 
 // Define subcategory to category relationship
@@ -506,6 +502,14 @@ export const subcategoriesRelations = relations(
     category: one(categories, {
       fields: [subcategories.categoryId],
       references: [categories.id],
+    }),
+    parent: one(subcategories, {
+      fields: [subcategories.parentId],
+      references: [subcategories.id],
+      relationName: "subcategoryParent",
+    }),
+    children: many(subcategories, {
+      relationName: "subcategoryParent",
     }),
     products: many(products),
   })
@@ -767,7 +771,7 @@ export const userActivities = pgTable("user_activities", {
   sessionId: text("session_id").notNull(), // For tracking anonymous users
   activityType: text("activity_type").notNull(), // view, search, add_to_cart, purchase, etc.
   productId: integer("product_id").references(() => products.id),
-  categoryId: integer("category_id").references(() => categories.id),
+  categoryId: integer("category_id"), // Reference to categories (FK removed due to forward reference)
   searchQuery: text("search_query"),
   timestamp: timestamp("timestamp").notNull().defaultNow(),
   additionalData: text("additional_data"), // JSON string with additional context
@@ -815,7 +819,7 @@ export const aiAssistantConversations = pgTable("ai_assistant_conversations", {
   userId: integer("user_id").references(() => users.id),
   sessionId: text("session_id").notNull(),
   productId: integer("product_id").references(() => products.id), // Optional - if about a specific product
-  categoryId: integer("category_id").references(() => categories.id), // Optional - if about a specific category
+  categoryId: integer("category_id"), // Optional - if about a specific category (FK removed due to forward reference)
   conversationHistory: text("conversation_history").notNull(), // JSON string of messages
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -1657,7 +1661,7 @@ export const shippingTrackingRelations = relations(
 
 // Extend orders relations to include tracking
 export const ordersTrackingRelations = relations(orders, ({ one }) => ({
-  tracking: one(shippingTracking),
+  tracking: one(() => shippingTracking),
 }));
 
 // Type exports for shipping tables
