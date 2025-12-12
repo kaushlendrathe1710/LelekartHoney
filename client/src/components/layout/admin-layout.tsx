@@ -162,6 +162,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       icon: <ShoppingBag className="h-5 w-5" />,
     },
     {
+      title: "Custom Invoice",
+      href: "/admin/custom-invoice",
+      icon: <FileText className="h-5 w-5" />,
+    },
+    {
       title: "Support Tickets",
       href: "/admin/tickets",
       icon: <FileEdit className="h-5 w-5" />,

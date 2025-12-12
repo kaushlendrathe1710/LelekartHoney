@@ -71,6 +71,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { InvoiceDialog } from "@/components/order/invoice-dialog";
+import { CustomInvoiceForm } from "@/components/invoice/custom-invoice-form";
 
 // Define types for orders and order items
 interface Product {
@@ -1038,6 +1039,13 @@ export default function SellerOrdersPage() {
               <TabsTrigger value="cancelled" className="text-xs md:text-sm">
                 Cancelled ({statusCounts.cancelled})
               </TabsTrigger>
+              <TabsTrigger
+                value="custom-invoice"
+                className="text-xs md:text-sm"
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                Custom Invoice
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -1110,6 +1118,21 @@ export default function SellerOrdersPage() {
               calculateSellingPriceTotal={calculateSellingPriceTotal}
               calculateListedPriceTotal={calculateListedPriceTotal}
             />
+          </TabsContent>
+
+          <TabsContent value="custom-invoice">
+            <Card>
+              <CardHeader>
+                <CardTitle>Generate Custom Invoice</CardTitle>
+                <CardDescription>
+                  Create a custom invoice by filling in the details below. This
+                  will use the same template as order invoices.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CustomInvoiceForm />
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

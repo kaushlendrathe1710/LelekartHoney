@@ -1575,6 +1575,230 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate custom invoice from form data
+  app.post("/api/invoices/generate-custom", async (req, res) => {
+    // Authentication check - only sellers and admins can generate custom invoices
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "seller" && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    try {
+      const {
+        invoiceNumber,
+        invoiceDate,
+        customer,
+        items,
+        subtotal,
+        totalGst,
+        grandTotal,
+        additionalNotes,
+      } = req.body;
+
+      console.log("Generating custom invoice:", invoiceNumber);
+
+      // Get seller details
+      const seller = await storage.getUser(req.user.id);
+      if (!seller) {
+        return res.status(404).json({ error: "Seller not found" });
+      }
+
+      // Get seller business details
+      let businessDetails = null;
+      let pickupAddress = null;
+      let taxInformation = null;
+
+      try {
+        businessDetails = await storage.getBusinessDetails(req.user.id);
+      } catch (err) {
+        console.warn("Failed to get business details:", err);
+      }
+
+      try {
+        const settings = await storage.getSellerSettings(req.user.id);
+        if (settings?.pickupAddress) {
+          pickupAddress =
+            typeof settings.pickupAddress === "string"
+              ? JSON.parse(settings.pickupAddress)
+              : settings.pickupAddress;
+        }
+        if (settings?.taxInformation) {
+          taxInformation =
+            typeof settings.taxInformation === "string"
+              ? JSON.parse(settings.taxInformation)
+              : settings.taxInformation;
+        }
+      } catch (err) {
+        console.warn("Failed to get seller settings:", err);
+      }
+
+      // Build invoice data structure similar to order invoice
+      const invoiceData = {
+        invoiceNumber,
+        invoiceDate: new Date(invoiceDate).toLocaleDateString("en-IN", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+        order: {
+          id: invoiceNumber,
+          date: new Date(invoiceDate),
+          formattedDate: new Date(invoiceDate).toLocaleDateString("en-IN"),
+          paymentMethod: "Custom",
+          orderNumber: invoiceNumber,
+          shippingDetails: {
+            address: customer.address,
+            address2: "",
+            city: customer.city,
+            state: customer.state,
+            zipCode: customer.pincode,
+            country: "India",
+          },
+          items: items.map((item: any, index: number) => ({
+            id: index + 1,
+            product: {
+              name: item.productName,
+              mrp: item.mrp || item.price,
+              gstRate: item.gstRate,
+              deliveryCharges: 0,
+            },
+            quantity: item.quantity,
+            price: item.price,
+            gstRate: item.gstRate,
+            subtotal: item.subtotal,
+            gstAmount: item.gstAmount,
+            total: item.total,
+          })),
+        },
+        user: {
+          name: customer.name,
+          email: customer.email,
+          phone: customer.phone,
+        },
+        buyer: {
+          name: customer.name,
+          email: customer.email,
+          phone: customer.phone,
+        },
+        seller: {
+          name: seller.name || seller.username,
+          businessName:
+            businessDetails?.businessName || seller.name || "Your Business",
+          phone: seller.phone || "N/A",
+          email: seller.email,
+          gstNumber:
+            taxInformation?.gstNumber || businessDetails?.gstNumber || "N/A",
+          address: pickupAddress?.line1 || "Business Address",
+          pickupAddress: pickupAddress
+            ? {
+                businessName:
+                  businessDetails?.businessName ||
+                  seller.name ||
+                  "Your Business",
+                line1: pickupAddress.line1 || "",
+                line2: pickupAddress.line2 || "",
+                city: pickupAddress.city || "",
+                state: pickupAddress.state || "",
+                pincode: pickupAddress.pincode || "",
+                country: "India",
+              }
+            : null,
+          billingAddress: pickupAddress
+            ? {
+                line1: pickupAddress.line1 || "",
+                line2: pickupAddress.line2 || "",
+                city: pickupAddress.city || "",
+                state: pickupAddress.state || "",
+                pincode: pickupAddress.pincode || "",
+                country: "India",
+              }
+            : null,
+          taxInformation: {
+            businessName:
+              businessDetails?.businessName || seller.name || "Your Business",
+            gstin:
+              taxInformation?.gstNumber || businessDetails?.gstNumber || "N/A",
+            panNumber: taxInformation?.panNumber || "N/A",
+          },
+        },
+        shippingAddress: {
+          address1: customer.address,
+          city: customer.city,
+          state: customer.state,
+          pincode: customer.pincode,
+          country: "India",
+        },
+        sellerAddress: pickupAddress || {
+          address1: "Business Address",
+          city: "City",
+          state: "State",
+          pincode: "000000",
+          country: "India",
+        },
+        items: items.map((item: any, index: number) => ({
+          id: index + 1,
+          product: {
+            name: item.productName,
+          },
+          quantity: item.quantity,
+          price: item.price,
+          gstRate: item.gstRate,
+          subtotal: item.subtotal,
+          gstAmount: item.gstAmount,
+          total: item.total,
+        })),
+        subtotal,
+        totalGst,
+        total: grandTotal,
+        grandTotal,
+        additionalNotes,
+        deliveryCharges: 0,
+        walletDiscount: 0,
+        rewardDiscount: 0,
+        redeemDiscount: 0,
+        store: {
+          pickupAddress,
+          taxInformation,
+        },
+        currentDate: new Date().toLocaleDateString("en-IN", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+      };
+
+      // Generate QR code with invoice details
+      const qrData = `Invoice: ${invoiceNumber}\nAmount: ₹${grandTotal}\nDate: ${invoiceData.invoiceDate}`;
+      const qrCodeDataUrl = await QRCode.toDataURL(qrData, {
+        errorCorrectionLevel: "H",
+        margin: 1,
+        width: 75,
+      });
+
+      invoiceData.qrCodeDataUrl = qrCodeDataUrl;
+
+      // Generate HTML using the same template as order invoices
+      const invoiceHtml = await generateInvoiceHtml(invoiceData);
+
+      // Generate PDF
+      const file = { content: invoiceHtml };
+      const pdfBuffer = await htmlPdf.generatePdf(file, HALF_A4_PDF_OPTIONS);
+
+      // Set response headers for PDF download
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${invoiceNumber}.pdf"`
+      );
+
+      // Send PDF buffer
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error("Error generating custom invoice:", error);
+      res.status(500).json({ error: "Failed to generate custom invoice" });
+    }
+  });
+
   // Generate shipping label PDF for an order
   // Debug endpoint for seeing HTML version of shipping label
   app.get("/api/orders/:id/shipping-label-html", async (req, res) => {

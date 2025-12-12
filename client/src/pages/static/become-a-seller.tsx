@@ -703,7 +703,7 @@ export default function BecomeASellerPage() {
         toast({
           title: "Application Submitted Successfully!",
           description:
-            "We've received your seller application. Our team will review it and contact you within 2-3 business days.",
+            "We've received your distributor application. Our team will review it and contact you within 2-3 business days.",
         });
 
         // Reset form
@@ -763,14 +763,14 @@ export default function BecomeASellerPage() {
   return (
     <>
       <Helmet>
-        <title>Become a Seller - LeleKart</title>
+        <title>Become a distributor - LeleKart</title>
         <meta
           name="description"
-          content="Join LeleKart as a seller and start selling your products to millions of customers. Complete seller registration with business verification."
+          content="Join LeleKart as a distributor and start distributing your products to millions of customers. Complete distributor registration with business verification."
         />
         <meta
           name="keywords"
-          content="become a seller, seller registration, sell online, ecommerce seller, LeleKart seller"
+          content="become a distributor, distributor registration, distribute online, ecommerce distributor, LeleKart distributor"
         />
       </Helmet>
 
@@ -780,10 +780,10 @@ export default function BecomeASellerPage() {
           <div className="bg-[#2874f0] text-white p-6 md:p-8 lg:p-16 rounded-t-lg">
             <div className="max-w-4xl mx-auto text-center">
               <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-3 md:mb-4">
-                Become a Seller on LeleKart
+                Become a Distributor on LeleKart
               </h1>
               <p className="text-base md:text-lg lg:text-xl mb-4 md:mb-6">
-                Join thousands of successful sellers and reach millions of
+                Join thousands of successful distributors and reach millions of
                 customers across India
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm md:text-base">
@@ -797,7 +797,7 @@ export default function BecomeASellerPage() {
                 </div>
                 <div className="flex items-center justify-center">
                   <CheckCircle className="h-5 w-5 mr-2" />
-                  <span>24/7 Seller Support</span>
+                  <span>24/7 Distributor Support</span>
                 </div>
               </div>
             </div>
@@ -816,7 +816,7 @@ export default function BecomeASellerPage() {
                         Start Your Selling Journey
                       </h2>
                       <p className="text-gray-600 mb-4">
-                        Complete the form below to register as a seller on
+                        Complete the form below to register as a distributor on
                         LeleKart. We'll review your application and get back to
                         you within 2-3 business days. All information provided
                         will be kept confidential and used only for verification
@@ -1689,7 +1689,7 @@ export default function BecomeASellerPage() {
                               className="text-blue-600 hover:underline"
                               target="_blank"
                             >
-                              Seller Agreement
+                              Distributor Agreement
                             </a>{" "}
                             *
                           </Label>
