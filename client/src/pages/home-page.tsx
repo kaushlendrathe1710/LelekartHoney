@@ -661,7 +661,7 @@ export default function HomePage() {
         )}
       </div>
       {/* --- Featured Deals, Best Seller, Trending (3 columns in one row) --- */}
-      <LazySection
+      {/* <LazySection
         fallback={<LazyLoadingFallback variant="cards" count={3} />}
         threshold={0.2}
         rootMargin="100px"
@@ -669,9 +669,9 @@ export default function HomePage() {
         <Suspense fallback={<LazyLoadingFallback variant="cards" count={3} />}>
           <FeaturedDealsSection featuredProducts={featuredProducts} />
         </Suspense>
-      </LazySection>
+      </LazySection> */}
       {/* --- Under Price Sections (with visible box) --- */}
-      <LazySection
+      {/* <LazySection
         fallback={<LazyLoadingFallback variant="cards" count={3} />}
         threshold={0.2}
         rootMargin="100px"
@@ -686,9 +686,9 @@ export default function HomePage() {
             isLoadingUnder599={isLoadingUnder599}
           />
         </Suspense>
-      </LazySection>
+      </LazySection> */}
       {/* --- Discount % Off Sections (third row, with visible box) --- */}
-      <LazySection
+      {/* <LazySection
         fallback={<LazyLoadingFallback variant="cards" count={6} />}
         threshold={0.2}
         rootMargin="100px"
@@ -709,7 +709,7 @@ export default function HomePage() {
             isLoading60to80={isLoading60to80}
           />
         </Suspense>
-      </LazySection>
+      </LazySection> */}
       {/* --- Recently Viewed Products --- */}
       <LazySection
         fallback={<LazyLoadingFallback variant="grid" count={5} />}

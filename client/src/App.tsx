@@ -88,6 +88,7 @@ import TicketManagementPage from "./pages/admin/ticket-management";
 import AffiliateMarketingPage from "./pages/admin/affilate-marketing";
 import AdminChatPage from "./pages/admin/chat";
 import SellerWithdrawalsPage from "./pages/admin/seller-withdrawals";
+import AdminCustomInvoicePage from "./pages/admin/custom-invoice";
 // Import shared components
 import { SuspenseWrapper } from "./components/shared/suspense-wrapper";
 import PressReleaseDetail from "./pages/static/press-release";
@@ -593,7 +594,7 @@ function App() {
                         )}
                       </Route>
 
-                      <Route path="/become-a-seller">
+                      <Route path="/become-a-distributor">
                         {() => (
                           <Layout>
                             <BecomeASellerPage />
@@ -684,6 +685,16 @@ function App() {
                             path="/admin/orders"
                             role="admin"
                             component={AdminOrders}
+                          />
+                        )}
+                      </Route>
+
+                      <Route path="/admin/custom-invoice">
+                        {() => (
+                          <ProtectedRoute
+                            path="/admin/custom-invoice"
+                            role="admin"
+                            component={AdminCustomInvoicePage}
                           />
                         )}
                       </Route>
