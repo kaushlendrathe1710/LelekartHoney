@@ -6,7 +6,7 @@
       "phases": {
         "install": {
           "cmds": [
-            "NODE_ENV=development npm install --legacy-peer-deps"
+            "NODE_ENV=development npm install"
           ]
         },
         "build": {
