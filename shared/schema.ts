@@ -82,6 +82,128 @@ export const insertUserSchema = createInsertSchema(users).pick({
   notificationPreferences: true,
 });
 
+// Distributor schema - for managing distributor accounts
+export const distributors = pgTable("distributors", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id)
+    .unique(), // One-to-one relationship with users table
+  companyName: text("company_name").notNull(),
+  businessType: text("business_type"), // Wholesale, Retail, etc.
+  gstNumber: text("gst_number"),
+  panNumber: text("pan_number"),
+  aadharCardUrl: text("aadhar_card_url"), // S3 URL for Aadhar card image (optional)
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  pincode: text("pincode"),
+  currentBalance: integer("current_balance").notNull().default(0), // Current outstanding balance
+  totalOrdered: integer("total_ordered").notNull().default(0), // Lifetime total ordered amount
+  totalPaid: integer("total_paid").notNull().default(0), // Lifetime total paid amount
+  creditLimit: integer("credit_limit").default(0), // Optional credit limit
+  active: boolean("active").notNull().default(true), // Active/Inactive status
+  notes: text("notes"), // Admin notes about distributor
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertDistributorSchema = createInsertSchema(distributors).pick({
+  userId: true,
+  companyName: true,
+  businessType: true,
+  gstNumber: true,
+  panNumber: true,
+  aadharCardUrl: true,
+  address: true,
+  city: true,
+  state: true,
+  pincode: true,
+  currentBalance: true,
+  totalOrdered: true,
+  totalPaid: true,
+  creditLimit: true,
+  active: true,
+  notes: true,
+});
+
+// Distributor Ledger schema - for tracking orders and payments
+export const distributorLedger = pgTable("distributor_ledger", {
+  id: serial("id").primaryKey(),
+  distributorId: integer("distributor_id")
+    .notNull()
+    .references(() => distributors.id, { onDelete: "cascade" }),
+  entryType: text("entry_type").notNull(), // 'order' or 'payment'
+  amount: integer("amount").notNull(), // Positive for orders, negative for payments
+  orderId: integer("order_id").references(() => orders.id), // Reference to order if entry_type is 'order'
+  description: text("description").notNull(), // Description of the transaction
+  balanceAfter: integer("balance_after").notNull(), // Running balance after this transaction
+  paymentMethod: text("payment_method"), // For payment entries: cash, bank_transfer, cheque, etc.
+  paymentReference: text("payment_reference"), // Cheque number, transaction ID, etc.
+  createdBy: integer("created_by").references(() => users.id), // Admin who created this entry
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  notes: text("notes"), // Additional notes
+});
+
+export const insertDistributorLedgerSchema = createInsertSchema(
+  distributorLedger
+).pick({
+  distributorId: true,
+  entryType: true,
+  amount: true,
+  orderId: true,
+  description: true,
+  balanceAfter: true,
+  paymentMethod: true,
+  paymentReference: true,
+  createdBy: true,
+  notes: true,
+});
+
+// Distributor Applications schema - for "Become a Distributor" form submissions
+export const distributorApplications = pgTable("distributor_applications", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  companyName: text("company_name").notNull(),
+  businessType: text("business_type"),
+  gstNumber: text("gst_number"),
+  panNumber: text("pan_number"),
+  aadharCardUrl: text("aadhar_card_url"),
+  address: text("address").notNull(),
+  city: text("city").notNull(),
+  state: text("state").notNull(),
+  pincode: text("pincode").notNull(),
+  notes: text("notes"),
+  status: text("status").notNull().default("pending"), // pending, approved, rejected
+  reviewedBy: integer("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertDistributorApplicationSchema = createInsertSchema(
+  distributorApplications
+).pick({
+  name: true,
+  email: true,
+  phone: true,
+  companyName: true,
+  businessType: true,
+  gstNumber: true,
+  panNumber: true,
+  aadharCardUrl: true,
+  address: true,
+  city: true,
+  state: true,
+  pincode: true,
+  contactPerson: true,
+  contactPhone: true,
+  contactEmail: true,
+  notes: true,
+});
+
 // Product schema
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
@@ -663,6 +785,20 @@ export const reviewRepliesRelations = relations(reviewReplies, ({ one }) => ({
 // Type exports
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type Distributor = typeof distributors.$inferSelect;
+export type InsertDistributor = z.infer<typeof insertDistributorSchema>;
+
+export type DistributorLedger = typeof distributorLedger.$inferSelect;
+export type InsertDistributorLedger = z.infer<
+  typeof insertDistributorLedgerSchema
+>;
+
+export type DistributorApplication =
+  typeof distributorApplications.$inferSelect;
+export type InsertDistributorApplication = z.infer<
+  typeof insertDistributorApplicationSchema
+>;
 
 export type Product = typeof products.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;

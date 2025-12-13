@@ -59,6 +59,9 @@ import {
   productVariants,
   orders,
   orderItems,
+  distributorApplications,
+  distributors,
+  distributorLedger,
 } from "@shared/schema";
 import returnRoutes from "./routes/return-routes"; // Import return management routes
 import * as backupHandlers from "./handlers/backup-handlers"; // Import backup handlers
@@ -1587,7 +1590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const {
         invoiceNumber,
         invoiceDate,
-        customer,
+        distributor,
         items,
         subtotal,
         totalGst,
@@ -1596,6 +1599,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } = req.body;
 
       console.log("Generating custom invoice:", invoiceNumber);
+
+      // Get the distributor's user account to create the order
+      const distributorRecord = await db
+        .select()
+        .from(distributors)
+        .where(eq(distributors.id, distributor.id))
+        .limit(1);
+
+      if (!distributorRecord.length) {
+        return res.status(404).json({ error: "Distributor not found" });
+      }
+
+      const distributorUserId = distributorRecord[0].userId;
 
       // Get seller details
       const seller = await storage.getUser(req.user.id);
@@ -1632,7 +1648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn("Failed to get seller settings:", err);
       }
 
-      // Build invoice data structure similar to order invoice
+      // Build invoice data structure for distributor invoice
       const invoiceData = {
         invoiceNumber,
         invoiceDate: new Date(invoiceDate).toLocaleDateString("en-IN", {
@@ -1647,11 +1663,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paymentMethod: "Custom",
           orderNumber: invoiceNumber,
           shippingDetails: {
-            address: customer.address,
+            address: distributor.address,
             address2: "",
-            city: customer.city,
-            state: customer.state,
-            zipCode: customer.pincode,
+            city: distributor.city,
+            state: distributor.state,
+            zipCode: distributor.pincode,
             country: "India",
           },
           items: items.map((item: any, index: number) => ({
@@ -1671,14 +1687,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })),
         },
         user: {
-          name: customer.name,
-          email: customer.email,
-          phone: customer.phone,
+          name: distributor.name,
+          email: distributor.email,
+          phone: distributor.phone,
         },
         buyer: {
-          name: customer.name,
-          email: customer.email,
-          phone: customer.phone,
+          name: distributor.name,
+          companyName: distributor.companyName,
+          email: distributor.email,
+          phone: distributor.phone,
+          gstNumber: distributor.gstNumber,
+          address: `${distributor.address}, ${distributor.city}, ${distributor.state} - ${distributor.pincode}`,
         },
         seller: {
           name: seller.name || seller.username,
@@ -1722,10 +1741,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         },
         shippingAddress: {
-          address1: customer.address,
-          city: customer.city,
-          state: customer.state,
-          pincode: customer.pincode,
+          address1: distributor.address,
+          city: distributor.city,
+          state: distributor.state,
+          pincode: distributor.pincode,
           country: "India",
         },
         sellerAddress: pickupAddress || {
@@ -1776,6 +1795,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       invoiceData.qrCodeDataUrl = qrCodeDataUrl;
+
+      // Create order on behalf of the distributor BEFORE generating PDF
+      const shippingDetails = {
+        name: distributor.name,
+        companyName: distributor.companyName,
+        email: distributor.email,
+        phone: distributor.phone,
+        address: distributor.address,
+        address2: "",
+        city: distributor.city,
+        state: distributor.state,
+        zipCode: distributor.pincode,
+        country: "India",
+      };
+
+      // Insert order
+      const [newOrder] = await db
+        .insert(orders)
+        .values({
+          userId: distributorUserId,
+          status: "confirmed",
+          total: grandTotal,
+          date: new Date(invoiceDate),
+          shippingDetails: JSON.stringify(shippingDetails),
+          paymentMethod: "custom_invoice",
+          orderId: invoiceNumber,
+        })
+        .returning();
+
+      // Insert order items
+      const orderItemsData = items.map((item: any) => ({
+        orderId: newOrder.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        price: item.price,
+        sellerId: req.user.id, // The admin/seller generating the invoice
+      }));
+
+      await db.insert(orderItems).values(orderItemsData);
+
+      // Get current balance from distributor ledger
+      const lastLedgerEntry = await db
+        .select()
+        .from(distributorLedger)
+        .where(eq(distributorLedger.distributorId, distributor.id))
+        .orderBy(desc(distributorLedger.id))
+        .limit(1);
+
+      const currentBalance = lastLedgerEntry.length
+        ? lastLedgerEntry[0].balanceAfter
+        : 0;
+      const newBalance = currentBalance + grandTotal;
+
+      // Add ledger entry for this order using storage method to update distributor totals
+      await storage.addLedgerEntry({
+        distributorId: distributor.id,
+        entryType: "order",
+        amount: grandTotal,
+        orderId: newOrder.id,
+        description: `Invoice ${invoiceNumber} - ${items.length} item(s)`,
+        balanceAfter: newBalance,
+        createdBy: req.user.id,
+        notes: additionalNotes || null,
+      });
+
+      console.log(
+        `Order ${newOrder.id} created for distributor ${distributor.id}, ledger updated with balance: ₹${newBalance / 100}`
+      );
 
       // Generate HTML using the same template as order invoices
       const invoiceHtml = await generateInvoiceHtml(invoiceData);
@@ -3422,9 +3509,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // and fetch seller information for each product
       const productsWithSellerInfo = await Promise.all(
         products.map(async (product) => {
-          // Ensure imageUrl exists for every product
-          if (!product.imageUrl) {
-            product.imageUrl = "/images/placeholder.svg";
+          // Parse images field but don't overwrite imageUrl if it already exists
+          if (product.images && typeof product.images === "string") {
+            try {
+              const parsedImages = JSON.parse(product.images);
+              if (Array.isArray(parsedImages) && parsedImages.length > 0) {
+                // Only set imageUrl from images if imageUrl is not already set
+                if (!product.imageUrl) {
+                  product.imageUrl = parsedImages[0];
+                }
+              }
+            } catch (e) {
+              // If parse fails, treat as single URL
+              if (!product.imageUrl) {
+                product.imageUrl = product.images;
+              }
+            }
           }
 
           // Get GST rate for this product's category
@@ -3519,6 +3619,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Import the debug utility
       const { debugProductVariants } = await import("./routes.debug");
       await debugProductVariants(id);
+
+      // Parse images field but don't overwrite imageUrl if it already exists
+      if (product.images && typeof product.images === "string") {
+        try {
+          const parsedImages = JSON.parse(product.images);
+          if (Array.isArray(parsedImages) && parsedImages.length > 0) {
+            // Only set imageUrl from images if imageUrl is not already set
+            if (!product.imageUrl) {
+              product.imageUrl = parsedImages[0];
+            }
+          }
+        } catch (e) {
+          // If parse fails, treat as single URL
+          if (!product.imageUrl) {
+            product.imageUrl = product.images;
+          }
+        }
+      }
 
       // Add GST calculations - Note: prices stored in DB already include GST
       const gstRate = product.gstRate ? Number(product.gstRate) : 0;
@@ -4103,6 +4221,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Add subcategory1 and subcategory2 (free text)
           subcategory1: productData.subcategory1 || null,
           subcategory2: productData.subcategory2 || null,
+          // Convert images array to JSON string for database storage
+          images: Array.isArray(productData.images)
+            ? JSON.stringify(productData.images)
+            : typeof productData.images === "string"
+              ? productData.images
+              : null,
         };
 
         // Validate numeric fields
@@ -4312,6 +4436,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Add subcategory1 and subcategory2 (free text)
         subcategory1: productData.subcategory1 || null,
         subcategory2: productData.subcategory2 || null,
+        // Convert images array to JSON string for database storage
+        images: Array.isArray(productData.images)
+          ? JSON.stringify(productData.images)
+          : typeof productData.images === "string"
+            ? productData.images
+            : null,
       };
 
       // Validate numeric fields
@@ -4491,6 +4621,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ) {
           processedProductData.returnPolicy =
             processedProductData.returnPolicy || null;
+        }
+
+        // Process images - ensure they're properly stringified
+        if (processedProductData && processedProductData.images !== undefined) {
+          if (Array.isArray(processedProductData.images)) {
+            processedProductData.images = JSON.stringify(
+              processedProductData.images
+            );
+          } else if (
+            typeof processedProductData.images === "string" &&
+            processedProductData.images.startsWith("[")
+          ) {
+            // Already JSON string, keep as is
+            processedProductData.images = processedProductData.images;
+          }
+        }
+
+        // Process imageUrl - ensure it's a single string, not an array
+        if (
+          processedProductData &&
+          processedProductData.imageUrl !== undefined
+        ) {
+          if (Array.isArray(processedProductData.imageUrl)) {
+            processedProductData.imageUrl =
+              processedProductData.imageUrl[0] || null;
+          }
         }
 
         // Log the subcategoryId specifically for debugging
@@ -7732,6 +7888,497 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Distributor Management Routes =====
+
+  // Get all distributors (Admin only)
+  app.get("/api/distributors", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "admin")
+      return res.status(403).json({ error: "Not authorized" });
+
+    try {
+      const distributors = await storage.getAllDistributors();
+      res.json(distributors);
+    } catch (error) {
+      console.error("Error fetching distributors:", error);
+      res.status(500).json({ error: "Failed to fetch distributors" });
+    }
+  });
+
+  // Get single distributor (Admin or the distributor themselves)
+  app.get("/api/distributors/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const id = parseInt(req.params.id);
+      const distributor = await storage.getDistributor(id);
+
+      if (!distributor) {
+        return res.status(404).json({ error: "Distributor not found" });
+      }
+
+      // Check authorization
+      if (req.user.role !== "admin" && distributor.userId !== req.user.id) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+
+      res.json(distributor);
+    } catch (error) {
+      console.error("Error fetching distributor:", error);
+      res.status(500).json({ error: "Failed to fetch distributor" });
+    }
+  });
+
+  // Get distributor by user ID (used for dashboard)
+  app.get("/api/distributors/user/:userId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const userId = parseInt(req.params.userId);
+
+      // Check authorization
+      if (req.user.role !== "admin" && req.user.id !== userId) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+
+      const distributor = await storage.getDistributorByUserId(userId);
+
+      if (!distributor) {
+        return res.status(404).json({ error: "Distributor not found" });
+      }
+
+      res.json(distributor);
+    } catch (error) {
+      console.error("Error fetching distributor:", error);
+      res.status(500).json({ error: "Failed to fetch distributor" });
+    }
+  });
+
+  // Create new distributor (Admin only)
+  app.post("/api/distributors", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "admin")
+      return res.status(403).json({ error: "Not authorized" });
+
+    try {
+      const { userId, ...distributorData } = req.body;
+
+      // Validate user exists and is a default role user
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Check if distributor already exists for this user
+      const existingDistributor = await storage.getDistributorByUserId(userId);
+      if (existingDistributor) {
+        return res
+          .status(400)
+          .json({ error: "Distributor already exists for this user" });
+      }
+
+      // Create distributor
+      const distributor = await storage.createDistributor({
+        userId,
+        ...distributorData,
+      });
+
+      res.status(201).json(distributor);
+    } catch (error) {
+      console.error("Error creating distributor:", error);
+      res.status(500).json({ error: "Failed to create distributor" });
+    }
+  });
+
+  // Update distributor (Admin only)
+  app.put("/api/distributors/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "admin")
+      return res.status(403).json({ error: "Not authorized" });
+
+    try {
+      const id = parseInt(req.params.id);
+      const distributor = await storage.updateDistributor(id, req.body);
+      res.json(distributor);
+    } catch (error) {
+      console.error("Error updating distributor:", error);
+      res.status(500).json({ error: "Failed to update distributor" });
+    }
+  });
+
+  // Delete distributor (Admin only)
+  app.delete("/api/distributors/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "admin")
+      return res.status(403).json({ error: "Not authorized" });
+
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteDistributor(id);
+      res.json({ message: "Distributor deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting distributor:", error);
+      res.status(500).json({ error: "Failed to delete distributor" });
+    }
+  });
+
+  // Get distributor ledger
+  app.get("/api/distributors/:id/ledger", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const id = parseInt(req.params.id);
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50;
+
+      const distributor = await storage.getDistributor(id);
+      if (!distributor) {
+        return res.status(404).json({ error: "Distributor not found" });
+      }
+
+      // Check authorization
+      if (req.user.role !== "admin" && distributor.userId !== req.user.id) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+
+      const result = await storage.getDistributorLedgerWithPagination(
+        id,
+        page,
+        limit
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching distributor ledger:", error);
+      res.status(500).json({ error: "Failed to fetch ledger" });
+    }
+  });
+
+  // Add payment to distributor ledger (Admin only)
+  app.post("/api/distributors/:id/payments", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "admin")
+      return res.status(403).json({ error: "Not authorized" });
+
+    try {
+      const distributorId = parseInt(req.params.id);
+      const { amount, paymentMethod, paymentReference, notes } = req.body;
+
+      // Validate amount
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ error: "Invalid payment amount" });
+      }
+
+      // Get current distributor balance
+      const distributor = await storage.getDistributor(distributorId);
+      if (!distributor) {
+        return res.status(404).json({ error: "Distributor not found" });
+      }
+
+      // Calculate new balance (payments are negative, reducing the balance)
+      const newBalance = distributor.currentBalance - amount;
+
+      // Create ledger entry
+      const entry = await storage.addLedgerEntry({
+        distributorId,
+        entryType: "payment",
+        amount: -amount, // Negative for payments
+        description: `Payment received - ${paymentMethod || "Unknown method"}`,
+        balanceAfter: newBalance,
+        paymentMethod,
+        paymentReference,
+        createdBy: req.user.id,
+        notes,
+      });
+
+      res.status(201).json(entry);
+    } catch (error) {
+      console.error("Error adding payment:", error);
+      res.status(500).json({ error: "Failed to add payment" });
+    }
+  });
+
+  // Become a Distributor application
+  app.post("/api/become-distributor", async (req, res) => {
+    try {
+      const {
+        email,
+        phone,
+        name,
+        companyName,
+        businessType,
+        gstNumber,
+        panNumber,
+        address,
+        city,
+        state,
+        pincode,
+        notes,
+        aadharCardUrl,
+      } = req.body;
+
+      // Insert into distributor_applications table
+      const application = await db
+        .insert(distributorApplications)
+        .values({
+          name,
+          email,
+          phone,
+          companyName,
+          businessType: businessType || null,
+          gstNumber: gstNumber || null,
+          panNumber: panNumber || null,
+          aadharCardUrl: aadharCardUrl || null,
+          address,
+          city,
+          state,
+          pincode,
+          notes: notes || null,
+          status: "pending",
+        })
+        .returning();
+
+      console.log("Distributor application saved:", application[0].id);
+
+      res.json({
+        success: true,
+        message: "Application submitted successfully",
+        applicationId: application[0].id,
+      });
+    } catch (error) {
+      console.error("Error submitting distributor application:", error);
+      res.status(500).json({ error: "Failed to submit application" });
+    }
+  });
+
+  // Get all distributor applications (admin only)
+  app.get("/api/admin/distributor-applications", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "admin")
+      return res.status(403).json({ error: "Not authorized" });
+
+    try {
+      const { status } = req.query;
+
+      let query = db.select().from(distributorApplications);
+
+      if (status && status !== "all") {
+        query = query.where(
+          eq(distributorApplications.status, status as string)
+        );
+      }
+
+      const applications = await query.orderBy(
+        desc(distributorApplications.createdAt)
+      );
+
+      res.json(applications);
+    } catch (error) {
+      console.error("Error fetching distributor applications:", error);
+      res.status(500).json({ error: "Failed to fetch applications" });
+    }
+  });
+
+  // Get single distributor application (admin only)
+  app.get("/api/admin/distributor-applications/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "admin")
+      return res.status(403).json({ error: "Not authorized" });
+
+    try {
+      const id = parseInt(req.params.id);
+      const application = await db
+        .select()
+        .from(distributorApplications)
+        .where(eq(distributorApplications.id, id))
+        .limit(1);
+
+      if (application.length === 0) {
+        return res.status(404).json({ error: "Application not found" });
+      }
+
+      res.json(application[0]);
+    } catch (error) {
+      console.error("Error fetching distributor application:", error);
+      res.status(500).json({ error: "Failed to fetch application" });
+    }
+  });
+
+  // Approve distributor application (admin only)
+  app.post(
+    "/api/admin/distributor-applications/:id/approve",
+    async (req, res) => {
+      if (!req.isAuthenticated()) return res.sendStatus(401);
+      if (req.user.role !== "admin")
+        return res.status(403).json({ error: "Not authorized" });
+
+      try {
+        const id = parseInt(req.params.id);
+        const { reviewNotes } = req.body;
+
+        // Get the application
+        const application = await db
+          .select()
+          .from(distributorApplications)
+          .where(eq(distributorApplications.id, id))
+          .limit(1);
+
+        if (application.length === 0) {
+          return res.status(404).json({ error: "Application not found" });
+        }
+
+        const app = application[0];
+
+        // Normalize email to lowercase for consistency
+        const normalizedEmail = app.email.toLowerCase();
+
+        // Check if user already exists with this email
+        const existingUser = await storage.getUserByEmail(normalizedEmail);
+
+        let newUser;
+        if (existingUser) {
+          // User already exists, just update their information
+          newUser = existingUser;
+          console.log(
+            `User already exists for email ${normalizedEmail}, using existing user ID: ${newUser.id}`
+          );
+
+          // Update user with complete profile information if missing
+          await db
+            .update(users)
+            .set({
+              name: app.name,
+              phone: app.phone,
+              address: `${app.address}, ${app.city}, ${app.state} - ${app.pincode}`,
+              approved: true,
+            })
+            .where(eq(users.id, existingUser.id));
+        } else {
+          // Create new user account with unique username
+          let username = normalizedEmail
+            .split("@")[0]
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, "");
+
+          // Check if username already exists and make it unique
+          let usernameExists = await storage.getUserByUsername(username);
+          let suffix = 1;
+          while (usernameExists) {
+            username = `${normalizedEmail
+              .split("@")[0]
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, "")}${suffix}`;
+            usernameExists = await storage.getUserByUsername(username);
+            suffix++;
+          }
+
+          const randomPassword = Array.from(Array(20), () =>
+            Math.floor(Math.random() * 36).toString(36)
+          ).join("");
+
+          newUser = await storage.createUser({
+            email: normalizedEmail,
+            username,
+            password: randomPassword,
+            role: "buyer",
+            name: app.name, // Use name from application
+            phone: app.phone, // Use phone from application
+            address: `${app.address}, ${app.city}, ${app.state} - ${app.pincode}`, // Complete address
+            isCoAdmin: false,
+            permissions: {},
+            approved: true,
+            rejected: false,
+          });
+        }
+
+        // Create distributor record
+        await db.insert(distributors).values({
+          userId: newUser.id,
+          companyName: app.companyName,
+          businessType: app.businessType,
+          gstNumber: app.gstNumber,
+          panNumber: app.panNumber,
+          aadharCardUrl: app.aadharCardUrl,
+          address: app.address,
+          city: app.city,
+          state: app.state,
+          pincode: app.pincode,
+          notes: app.notes,
+          active: true,
+        });
+
+        // Update application status
+        await db
+          .update(distributorApplications)
+          .set({
+            status: "approved",
+            reviewedBy: req.user.id,
+            reviewedAt: new Date(),
+            reviewNotes: reviewNotes || null,
+          })
+          .where(eq(distributorApplications.id, id));
+
+        res.json({
+          success: true,
+          message: "Application approved and distributor created",
+        });
+      } catch (error) {
+        console.error("Error approving distributor application:", error);
+        res.status(500).json({ error: "Failed to approve application" });
+      }
+    }
+  );
+
+  // Reject distributor application (admin only)
+  app.post(
+    "/api/admin/distributor-applications/:id/reject",
+    async (req, res) => {
+      if (!req.isAuthenticated()) return res.sendStatus(401);
+      if (req.user.role !== "admin")
+        return res.status(403).json({ error: "Not authorized" });
+
+      try {
+        const id = parseInt(req.params.id);
+        const { reviewNotes } = req.body;
+
+        await db
+          .update(distributorApplications)
+          .set({
+            status: "rejected",
+            reviewedBy: req.user.id,
+            reviewedAt: new Date(),
+            reviewNotes: reviewNotes || null,
+          })
+          .where(eq(distributorApplications.id, id));
+
+        res.json({ success: true, message: "Application rejected" });
+      } catch (error) {
+        console.error("Error rejecting distributor application:", error);
+        res.status(500).json({ error: "Failed to reject application" });
+      }
+    }
+  );
+
+  // Upload Aadhar card to S3
+  app.post("/api/upload/aadhar", upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      // Upload to S3 using the existing S3 setup
+      const uploadResult = await uploadFileToS3(req.file);
+
+      res.json({
+        url: uploadResult.Location,
+        filename: req.file.originalname,
+      });
+    } catch (error) {
+      console.error("Error uploading Aadhar:", error);
+      res.status(500).json({ error: "Failed to upload file" });
+    }
+  });
+
   // Co-Admin Management
 
   // Get all co-admins
@@ -7826,15 +8473,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const { email, username, role } = req.body;
+      const { email, username, role, name, phone } = req.body;
 
-      if (!email || !username || !role) {
-        return res
-          .status(400)
-          .json({ error: "Email, username, and role are required" });
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
       }
 
-      if (role !== "buyer" && role !== "seller") {
+      // Default role to 'buyer' if not provided
+      const userRole = role || "buyer";
+
+      if (userRole !== "buyer" && userRole !== "seller") {
         return res
           .status(400)
           .json({ error: "Role must be either 'buyer' or 'seller'" });
@@ -7848,6 +8496,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .json({ error: "User with this email already exists" });
       }
 
+      // Generate username from email if not provided
+      const finalUsername =
+        username ||
+        email
+          .split("@")[0]
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "");
+
       // Create a random password since we're using OTP authentication
       const randomPassword = Array.from(Array(20), () =>
         Math.floor(Math.random() * 36).toString(36)
@@ -7856,12 +8512,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create the user
       const newUser = await storage.createUser({
         email,
-        username,
+        username: finalUsername,
         password: randomPassword, // Use random password since authentication is via OTP
-        role,
+        role: userRole,
+        name: name || null, // Include name if provided
+        phone: phone || null, // Include phone if provided
         isCoAdmin: false,
         permissions: {},
-        approved: role === "buyer", // Buyers are auto-approved, sellers need approval
+        approved: userRole === "buyer", // Buyers are auto-approved, sellers need approval
         rejected: false,
       });
 
@@ -13923,7 +14581,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Convert logo and signature images to base64
       const logoUrl =
-        "https://drive.google.com/uc?export=view&id=1LTlPnVbtn6oiDsYoVX7-umnZH5JnWZBN";
+        // "https://drive.google.com/uc?export=view&id=1LTlPnVbtn6oiDsYoVX7-umnZH5JnWZBN";
+        "https://chunumunu.s3.ap-northeast-1.amazonaws.com/brand/Logo/krpl+final+logo.png";
 
       const signatureUrl =
         data.seller?.pickupAddress?.authorizationSignature ||
@@ -14027,12 +14686,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     .invoice-logo {
-      max-height: 35px;
+      max-height: 50px;
       margin-top: 2px;
-      height: 30px;
+      height: 50px;
       max-width: 120px;
       object-fit: contain;
-      margin-bottom: 5px;
+      margin-bottom: 2px;
     }
     
     .invoice-title {
@@ -14266,7 +14925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     <!-- Fixed Header Section with proper alignment -->
     <div class="invoice-header">
       <div class="header-left">
-        <img src="${logoBase64}" alt="LeleKart Logo" class="invoice-logo">
+        <img src="${logoBase64}" alt="Papa Honey Logo" class="invoice-logo">
       </div>
       
       <div class="header-right">

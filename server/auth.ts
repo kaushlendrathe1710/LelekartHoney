@@ -217,7 +217,9 @@ export function setupAuth(app: Express) {
           return res.status(400).json({ error: "Invalid email address" });
         }
 
-        const { email } = validation.data;
+        const { email: rawEmail } = validation.data;
+        // Normalize email to lowercase for consistency
+        const email = rawEmail.toLowerCase();
         console.log(`Processing OTP request for email: ${email}`);
 
         // We'll remove the special admin bypass - all admins must verify OTP
@@ -273,7 +275,9 @@ export function setupAuth(app: Express) {
           return res.status(400).json({ error: "Invalid request" });
         }
 
-        const { email, otp } = validation.data;
+        const { email: rawEmail, otp } = validation.data;
+        // Normalize email to lowercase for consistency
+        const email = rawEmail.toLowerCase();
 
         // Verify OTP
         const isValid = await verifyOTP(email, otp);
