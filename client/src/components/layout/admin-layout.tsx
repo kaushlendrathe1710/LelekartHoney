@@ -162,6 +162,16 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       icon: <ShoppingBag className="h-5 w-5" />,
     },
     {
+      title: "Distributors",
+      href: "/admin/distributors",
+      icon: <Users className="h-5 w-5" />,
+    },
+    {
+      title: "Distributor Applications",
+      href: "/admin/distributor-applications",
+      icon: <FileText className="h-5 w-5" />,
+    },
+    {
       title: "Custom Invoice",
       href: "/admin/custom-invoice",
       icon: <FileText className="h-5 w-5" />,
@@ -316,14 +326,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               <SidebarTrigger className="text-black hover:bg-[#EADDCB] hover:text-black" />
               {/* Logo - using Link instead of window.location for client-side routing to maintain session */}
               <Link href="/">
-                <Button
-                  variant="ghost"
-                  className="p-0 hover:bg-transparent focus:bg-transparent"
-                >
-                  <div className="flex items-center space-x-2 text-xl font-bold">
-                    <Logo />
-                  </div>
-                </Button>
+                <Logo />
               </Link>
 
               {/* AI-powered Search Box */}

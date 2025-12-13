@@ -143,6 +143,13 @@ import {
   walletSettings,
   WalletSettings as SelectWalletSettings,
   InsertWalletSettings,
+  // Distributor imports
+  distributors,
+  Distributor,
+  InsertDistributor,
+  distributorLedger,
+  DistributorLedger,
+  InsertDistributorLedger,
   // System settings
   systemSettings,
   SystemSetting,
@@ -2170,6 +2177,176 @@ export class DatabaseStorage implements IStorage {
       console.error(`Error recovering user with ID ${id}:`, error);
       throw new Error(`Failed to recover user: ${(error as Error).message}`);
     }
+  }
+
+  // ===== Distributor Management Methods =====
+
+  async createDistributor(
+    insertDistributor: InsertDistributor
+  ): Promise<Distributor> {
+    const [distributor] = await db
+      .insert(distributors)
+      .values(insertDistributor)
+      .returning();
+    return distributor;
+  }
+
+  async getDistributor(id: number): Promise<any | undefined> {
+    const [distributor] = await db
+      .select({
+        id: distributors.id,
+        userId: distributors.userId,
+        companyName: distributors.companyName,
+        businessType: distributors.businessType,
+        gstNumber: distributors.gstNumber,
+        panNumber: distributors.panNumber,
+        address: distributors.address,
+        city: distributors.city,
+        state: distributors.state,
+        pincode: distributors.pincode,
+        currentBalance: distributors.currentBalance,
+        totalOrdered: distributors.totalOrdered,
+        totalPaid: distributors.totalPaid,
+        active: distributors.active,
+        notes: distributors.notes,
+        createdAt: distributors.createdAt,
+        updatedAt: distributors.updatedAt,
+        userName: users.name,
+        userEmail: users.email,
+        userPhone: users.phone,
+      })
+      .from(distributors)
+      .leftJoin(users, eq(distributors.userId, users.id))
+      .where(eq(distributors.id, id));
+    return distributor;
+  }
+
+  async getDistributorByUserId(
+    userId: number
+  ): Promise<Distributor | undefined> {
+    const [distributor] = await db
+      .select()
+      .from(distributors)
+      .where(eq(distributors.userId, userId));
+    return distributor;
+  }
+
+  async getAllDistributors(): Promise<any[]> {
+    return db
+      .select({
+        id: distributors.id,
+        userId: distributors.userId,
+        companyName: distributors.companyName,
+        businessType: distributors.businessType,
+        gstNumber: distributors.gstNumber,
+        panNumber: distributors.panNumber,
+        address: distributors.address,
+        city: distributors.city,
+        state: distributors.state,
+        pincode: distributors.pincode,
+        currentBalance: distributors.currentBalance,
+        totalOrdered: distributors.totalOrdered,
+        totalPaid: distributors.totalPaid,
+        active: distributors.active,
+        createdAt: distributors.createdAt,
+        updatedAt: distributors.updatedAt,
+        userName: users.name,
+        userEmail: users.email,
+        userPhone: users.phone,
+      })
+      .from(distributors)
+      .leftJoin(users, eq(distributors.userId, users.id))
+      .orderBy(desc(distributors.createdAt));
+  }
+
+  async updateDistributor(
+    id: number,
+    data: Partial<Distributor>
+  ): Promise<Distributor> {
+    const [updatedDistributor] = await db
+      .update(distributors)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(distributors.id, id))
+      .returning();
+
+    if (!updatedDistributor) {
+      throw new Error(`Distributor with ID ${id} not found`);
+    }
+
+    return updatedDistributor;
+  }
+
+  async deleteDistributor(id: number): Promise<void> {
+    await db.delete(distributors).where(eq(distributors.id, id));
+  }
+
+  // Distributor Ledger Methods
+
+  async addLedgerEntry(
+    insertEntry: InsertDistributorLedger
+  ): Promise<DistributorLedger> {
+    const [entry] = await db
+      .insert(distributorLedger)
+      .values(insertEntry)
+      .returning();
+
+    // Update distributor totals and balance
+    const distributor = await this.getDistributor(insertEntry.distributorId);
+    if (!distributor) {
+      throw new Error(
+        `Distributor with ID ${insertEntry.distributorId} not found`
+      );
+    }
+
+    let updates: Partial<Distributor> = {
+      currentBalance: insertEntry.balanceAfter,
+    };
+
+    if (insertEntry.entryType === "order") {
+      updates.totalOrdered = distributor.totalOrdered + insertEntry.amount;
+    } else if (insertEntry.entryType === "payment") {
+      updates.totalPaid = distributor.totalPaid + Math.abs(insertEntry.amount);
+    }
+
+    await this.updateDistributor(insertEntry.distributorId, updates);
+
+    return entry;
+  }
+
+  async getDistributorLedger(
+    distributorId: number
+  ): Promise<DistributorLedger[]> {
+    return db
+      .select()
+      .from(distributorLedger)
+      .where(eq(distributorLedger.distributorId, distributorId))
+      .orderBy(desc(distributorLedger.createdAt));
+  }
+
+  async getDistributorLedgerWithPagination(
+    distributorId: number,
+    page: number = 1,
+    limit: number = 50
+  ): Promise<{ entries: DistributorLedger[]; total: number }> {
+    const offset = (page - 1) * limit;
+
+    const entries = await db
+      .select()
+      .from(distributorLedger)
+      .where(eq(distributorLedger.distributorId, distributorId))
+      .orderBy(desc(distributorLedger.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(distributorLedger)
+      .where(eq(distributorLedger.distributorId, distributorId));
+
+    return {
+      entries,
+      total: count,
+    };
   }
 
   // Co-Admin Management Methods

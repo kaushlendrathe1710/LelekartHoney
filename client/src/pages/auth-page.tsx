@@ -287,13 +287,29 @@ export default function AuthPage() {
                   "OTP login successful, found user role:",
                   data.user.role
                 );
-                setTimeout(() => {
+                setTimeout(async () => {
                   if (data.user?.role === "admin") {
                     setLocation("/admin");
                   } else if (data.user?.role === "seller") {
                     setLocation("/seller/dashboard");
                   } else if (data.user?.role === "buyer") {
-                    setLocation("/buyer/dashboard");
+                    // Check if user is a distributor
+                    try {
+                      const distRes = await fetch(
+                        `/api/distributors/user/${data.user.id}`,
+                        {
+                          credentials: "include",
+                        }
+                      );
+                      if (distRes.ok) {
+                        setLocation("/distributor/dashboard");
+                      } else {
+                        setLocation("/buyer/dashboard");
+                      }
+                    } catch (err) {
+                      console.error("Error checking distributor status:", err);
+                      setLocation("/buyer/dashboard");
+                    }
                   } else {
                     setLocation("/");
                   }
@@ -303,7 +319,7 @@ export default function AuthPage() {
                 // Force a query refetch to get the user data
                 queryClient
                   .fetchQuery<User>({ queryKey: ["/api/user"] })
-                  .then((userData) => {
+                  .then(async (userData) => {
                     console.log("Fetched user data after OTP:", userData);
                     if (userData) {
                       if (userData.role === "admin") {
@@ -311,7 +327,26 @@ export default function AuthPage() {
                       } else if (userData.role === "seller") {
                         setLocation("/seller/dashboard");
                       } else if (userData.role === "buyer") {
-                        setLocation("/buyer/dashboard");
+                        // Check if user is a distributor
+                        try {
+                          const distRes = await fetch(
+                            `/api/distributors/user/${userData.id}`,
+                            {
+                              credentials: "include",
+                            }
+                          );
+                          if (distRes.ok) {
+                            setLocation("/distributor/dashboard");
+                          } else {
+                            setLocation("/buyer/dashboard");
+                          }
+                        } catch (err) {
+                          console.error(
+                            "Error checking distributor status:",
+                            err
+                          );
+                          setLocation("/buyer/dashboard");
+                        }
                       } else {
                         setLocation("/");
                       }

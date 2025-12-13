@@ -12,7 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Download, FileText, Loader2 } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Download,
+  FileText,
+  Loader2,
+  Building2,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -22,6 +29,19 @@ interface Product {
   price: number;
   gstRate: number;
   mrp: number;
+}
+
+interface Distributor {
+  id: number;
+  companyName: string;
+  contactEmail: string;
+  contactPhone: string;
+  contactPerson: string;
+  gstNumber?: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
 }
 
 interface InvoiceItem {
@@ -34,13 +54,7 @@ interface InvoiceItem {
 }
 
 interface CustomInvoiceFormData {
-  customerName: string;
-  customerEmail: string;
-  customerPhone: string;
-  customerAddress: string;
-  customerCity: string;
-  customerState: string;
-  customerPincode: string;
+  distributorId: string;
   items: InvoiceItem[];
   additionalNotes?: string;
 }
@@ -49,7 +63,9 @@ export function CustomInvoiceForm() {
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
+  const [distributors, setDistributors] = useState<Distributor[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [loadingDistributors, setLoadingDistributors] = useState(true);
 
   const {
     register,
@@ -60,6 +76,7 @@ export function CustomInvoiceForm() {
     formState: { errors },
   } = useForm<CustomInvoiceFormData>({
     defaultValues: {
+      distributorId: "",
       items: [
         {
           productId: 0,
@@ -93,7 +110,28 @@ export function CustomInvoiceForm() {
         setLoadingProducts(false);
       }
     };
+
+    const fetchDistributors = async () => {
+      try {
+        const res = await fetch("/api/distributors");
+        if (res.ok) {
+          const data = await res.json();
+          setDistributors(data || []);
+        }
+      } catch (error) {
+        console.error("Failed to fetch distributors:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load distributors",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingDistributors(false);
+      }
+    };
+
     fetchProducts();
+    fetchDistributors();
   }, [toast]);
 
   const { fields, append, remove } = useFieldArray({
@@ -128,6 +166,15 @@ export function CustomInvoiceForm() {
     setIsGenerating(true);
 
     try {
+      // Find selected distributor
+      const distributor = distributors.find(
+        (d) => d.id.toString() === data.distributorId
+      );
+
+      if (!distributor) {
+        throw new Error("Distributor not found");
+      }
+
       toast({
         title: "Generating Invoice",
         description: "Your custom invoice is being generated...",
@@ -152,14 +199,17 @@ export function CustomInvoiceForm() {
       const invoiceData = {
         invoiceNumber,
         invoiceDate: new Date().toISOString(),
-        customer: {
-          name: data.customerName,
-          email: data.customerEmail,
-          phone: data.customerPhone,
-          address: data.customerAddress,
-          city: data.customerCity,
-          state: data.customerState,
-          pincode: data.customerPincode,
+        distributor: {
+          id: distributor.id,
+          companyName: distributor.companyName,
+          name: distributor.contactPerson,
+          email: distributor.contactEmail,
+          phone: distributor.contactPhone,
+          gstNumber: distributor.gstNumber || "N/A",
+          address: distributor.address,
+          city: distributor.city,
+          state: distributor.state,
+          pincode: distributor.pincode,
         },
         items: itemsWithTotals,
         subtotal: items.reduce(
@@ -221,139 +271,45 @@ export function CustomInvoiceForm() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Customer Information
+            <Building2 className="h-5 w-5" />
+            Distributor Information
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="customerName">Customer Name *</Label>
-              <Input
-                id="customerName"
-                {...register("customerName", {
-                  required: "Customer name is required",
-                })}
-                placeholder="Enter customer name"
-              />
-              {errors.customerName && (
-                <p className="text-sm text-red-500">
-                  {errors.customerName.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="customerEmail">Email *</Label>
-              <Input
-                id="customerEmail"
-                type="email"
-                {...register("customerEmail", {
-                  required: "Email is required",
-                  pattern: {
-                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                    message: "Invalid email address",
-                  },
-                })}
-                placeholder="customer@example.com"
-              />
-              {errors.customerEmail && (
-                <p className="text-sm text-red-500">
-                  {errors.customerEmail.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="customerPhone">Phone Number *</Label>
-              <Input
-                id="customerPhone"
-                {...register("customerPhone", {
-                  required: "Phone number is required",
-                  pattern: {
-                    value: /^[0-9]{10}$/,
-                    message: "Phone number must be 10 digits",
-                  },
-                })}
-                placeholder="10-digit phone number"
-                maxLength={10}
-              />
-              {errors.customerPhone && (
-                <p className="text-sm text-red-500">
-                  {errors.customerPhone.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="customerPincode">Pincode *</Label>
-              <Input
-                id="customerPincode"
-                {...register("customerPincode", {
-                  required: "Pincode is required",
-                  pattern: {
-                    value: /^[0-9]{6}$/,
-                    message: "Pincode must be 6 digits",
-                  },
-                })}
-                placeholder="6-digit pincode"
-                maxLength={6}
-              />
-              {errors.customerPincode && (
-                <p className="text-sm text-red-500">
-                  {errors.customerPincode.message}
-                </p>
-              )}
-            </div>
-          </div>
-
           <div className="space-y-2">
-            <Label htmlFor="customerAddress">Address *</Label>
-            <Textarea
-              id="customerAddress"
-              {...register("customerAddress", {
-                required: "Address is required",
-              })}
-              placeholder="Enter complete address"
-              rows={2}
-            />
-            {errors.customerAddress && (
-              <p className="text-sm text-red-500">
-                {errors.customerAddress.message}
-              </p>
+            <Label htmlFor="distributorId">Select Distributor *</Label>
+            {loadingDistributors ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm text-muted-foreground">
+                  Loading distributors...
+                </span>
+              </div>
+            ) : (
+              <Select
+                onValueChange={(value) => setValue("distributorId", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a distributor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {distributors.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      No distributors found
+                    </SelectItem>
+                  ) : (
+                    distributors.map((dist) => (
+                      <SelectItem key={dist.id} value={dist.id.toString()}>
+                        {dist.companyName} - {dist.contactPerson}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="customerCity">City *</Label>
-              <Input
-                id="customerCity"
-                {...register("customerCity", { required: "City is required" })}
-                placeholder="Enter city"
-              />
-              {errors.customerCity && (
-                <p className="text-sm text-red-500">
-                  {errors.customerCity.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="customerState">State *</Label>
-              <Input
-                id="customerState"
-                {...register("customerState", {
-                  required: "State is required",
-                })}
-                placeholder="Enter state"
-              />
-              {errors.customerState && (
-                <p className="text-sm text-red-500">
-                  {errors.customerState.message}
-                </p>
-              )}
-            </div>
+            {errors.distributorId && (
+              <p className="text-sm text-red-500">Distributor is required</p>
+            )}
           </div>
         </CardContent>
       </Card>

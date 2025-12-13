@@ -130,7 +130,6 @@ const productSchema = z
       .nullable(),
     returnPolicy: z
       .string()
-      .min(1, "Return policy is required")
       .max(1000, "Return policy cannot exceed 1000 characters")
       .optional()
       .nullable(),
@@ -182,6 +181,7 @@ export default function AddProductForm({
 }: AddProductFormProps) {
   // Initialize state with values from initialValues if provided (for edit mode)
   // Ensure images are properly initialized, handling different possible formats
+  const [mainImage, setMainImage] = useState<string>("");
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [variants, setVariants] = useState<ProductVariant[]>(
     initialValues?.variants?.filter((v: any) => v.id > 0) || []
@@ -201,6 +201,30 @@ export default function AddProductForm({
 
   // Prefill images when editing (initialValues changes)
   useEffect(() => {
+    // Initialize main image
+    if (initialValues?.imageUrl) {
+      // Handle PostgreSQL array format {\"url1\",\"url2\"}
+      let imageUrl = initialValues.imageUrl;
+      if (typeof imageUrl === "string" && imageUrl.startsWith("{")) {
+        try {
+          const arrayStr = imageUrl.replace(/^\{/, "[").replace(/\}$/, "]");
+          const parsed = JSON.parse(arrayStr);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMainImage(parsed[0]);
+          } else {
+            setMainImage(imageUrl);
+          }
+        } catch (e) {
+          setMainImage(imageUrl);
+        }
+      } else {
+        setMainImage(imageUrl);
+      }
+    } else {
+      setMainImage("");
+    }
+
+    // Initialize additional images
     if (!initialValues?.images) {
       setUploadedImages([]);
       return;
@@ -211,24 +235,26 @@ export default function AddProductForm({
     }
     if (typeof initialValues.images === "string") {
       try {
-        if (
-          initialValues.images.startsWith("[") &&
-          initialValues.images.includes("]")
-        ) {
-          const parsed = JSON.parse(initialValues.images);
+        // Handle PostgreSQL array format {\"url1\",\"url2\"}
+        let imageStr = initialValues.images;
+        if (imageStr.startsWith("{") && imageStr.endsWith("}")) {
+          imageStr = imageStr.replace(/^\{/, "[").replace(/\}$/, "]");
+        }
+        if (imageStr.startsWith("[") && imageStr.includes("]")) {
+          const parsed = JSON.parse(imageStr);
           if (Array.isArray(parsed)) {
             setUploadedImages(parsed);
             return;
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error("Failed to parse images:", e);
+      }
       setUploadedImages([initialValues.images]);
       return;
     }
     setUploadedImages([]);
-  }, [initialValues]);
-
-  // Query to fetch categories with GST rates
+  }, [initialValues]); // Query to fetch categories with GST rates
   const { data: categoriesData, isLoading: isCategoriesLoading } = useQuery({
     queryKey: ["/api/categories"],
   });
@@ -375,7 +401,7 @@ export default function AddProductForm({
       watchedDescription && watchedDescription.length >= 20
     );
     const inventoryComplete = Boolean(watchedStock);
-    const imagesComplete = uploadedImages.length > 0;
+    const imagesComplete = mainImage && uploadedImages.length > 0;
     const total = [
       basicComplete,
       descriptionComplete,
@@ -819,6 +845,15 @@ export default function AddProductForm({
       }
 
       // Additional validation for images
+      if (!mainImage) {
+        toast({
+          title: "Main Image Required",
+          description: "Please upload a main product image",
+          variant: "destructive",
+        });
+        return;
+      }
+
       if (uploadedImages.length === 0) {
         toast({
           title: "Images Required",
@@ -885,6 +920,8 @@ export default function AddProductForm({
       const productData = {
         ...processedFormValues,
         gstRate: processedFormValues.gstRate ?? 0,
+        imageUrl: mainImage || null,
+        image_url: mainImage || null, // Also send as snake_case for backend compatibility
         images: uploadedImages,
         variants: [...variants, ...draftVariants],
       };
@@ -1765,6 +1802,7 @@ export default function AddProductForm({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value="N/A">N/A (No Returns)</SelectItem>
                           <SelectItem value="7">7 Days</SelectItem>
                           <SelectItem value="15">15 Days</SelectItem>
                           <SelectItem value="30">30 Days</SelectItem>
@@ -2306,12 +2344,80 @@ export default function AddProductForm({
                   Upload high-quality product images
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <FileUpload
-                  onChange={handleAddImage}
-                  accept="image/*"
-                  multiple={true}
-                />
+              <CardContent className="space-y-6">
+                {/* Main Image Section */}
+                <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <label className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                    Main Product Image * (Required)
+                  </label>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    This will be the primary image shown on product listings
+                  </p>
+                  <FileUpload
+                    value={mainImage}
+                    onChange={(url) => {
+                      if (typeof url === "string") {
+                        setMainImage(url);
+                      } else if (Array.isArray(url) && url.length > 0) {
+                        setMainImage(url[0]);
+                      }
+                    }}
+                    accept="image/*"
+                    multiple={false}
+                  />
+                  <div className="flex items-center gap-2 mt-2">
+                    <Input
+                      type="url"
+                      placeholder="Or enter main image URL (https://...)"
+                      value={mainImage}
+                      onChange={(e) => setMainImage(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                  {mainImage && (
+                    <div className="relative mt-2 w-32 h-32 border rounded bg-gray-100">
+                      <img
+                        src={mainImage}
+                        alt="Main product"
+                        className="w-full h-full object-cover rounded"
+                        onError={(e) => {
+                          console.error(
+                            "Failed to load main image:",
+                            mainImage
+                          );
+                          toast({
+                            title: "Image Load Error",
+                            description:
+                              "Failed to load the image. Please try another URL.",
+                            variant: "destructive",
+                          });
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setMainImage("")}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Additional Images Section */}
+                <div className="space-y-2 pt-4 border-t">
+                  <label className="text-sm font-medium">
+                    Additional Images
+                  </label>
+                  <p className="text-sm text-muted-foreground">
+                    Upload more product images (optional)
+                  </p>
+                  <FileUpload
+                    onChange={handleAddImage}
+                    accept="image/*"
+                    multiple={true}
+                  />
+                </div>
 
                 {/* Add image via URL */}
                 <div className="flex items-center gap-2">
@@ -2372,13 +2478,6 @@ export default function AddProductForm({
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
-
-                          {/* Badge for main image */}
-                          {index === 0 && (
-                            <Badge className="absolute top-1 left-1 bg-primary text-primary-foreground">
-                              Main
-                            </Badge>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -2388,18 +2487,17 @@ export default function AddProductForm({
                         <ImagePlus className="h-6 w-6 text-muted-foreground" />
                       </div>
                       <h3 className="mt-4 text-sm font-medium">
-                        No images uploaded
+                        No additional images uploaded
                       </h3>
                       <p className="mt-2 text-xs text-muted-foreground">
-                        Upload at least one high-quality image of your product
+                        Upload more images to show in the product gallery
                       </p>
                     </div>
                   )}
                 </div>
 
                 <p className="text-xs text-muted-foreground mt-2">
-                  First image will be used as the main product image. You can
-                  upload up to 8 images (max 5MB each).
+                  You can upload up to 8 additional images (max 5MB each).
                 </p>
               </CardContent>
             </Card>

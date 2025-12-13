@@ -45,6 +45,7 @@ import ReturnsPage from "./pages/static/returns";
 import PrivacyPolicyPage from "./pages/static/privacy";
 import PaymentsPage from "./pages/static/payments";
 import BecomeASellerPage from "./pages/static/become-a-seller";
+import BecomeADistributorPage from "./pages/static/become-a-distributor";
 import ChatPage from "./pages/chat";
 import { Layout } from "./components/layout/layout";
 import { SimpleHeader } from "./components/layout/simple-header";
@@ -89,6 +90,11 @@ import AffiliateMarketingPage from "./pages/admin/affilate-marketing";
 import AdminChatPage from "./pages/admin/chat";
 import SellerWithdrawalsPage from "./pages/admin/seller-withdrawals";
 import AdminCustomInvoicePage from "./pages/admin/custom-invoice";
+import DistributorsPage from "./pages/admin/distributors";
+import CreateDistributorPage from "./pages/admin/create-distributor";
+import DistributorDetailsPage from "./pages/admin/distributor-details";
+import DistributorApplicationsPage from "./pages/admin/distributor-applications";
+import DistributorDashboard from "./pages/distributor/dashboard";
 // Import shared components
 import { SuspenseWrapper } from "./components/shared/suspense-wrapper";
 import PressReleaseDetail from "./pages/static/press-release";
@@ -597,7 +603,7 @@ function App() {
                       <Route path="/become-a-distributor">
                         {() => (
                           <Layout>
-                            <BecomeASellerPage />
+                            <BecomeADistributorPage />
                           </Layout>
                         )}
                       </Route>
@@ -695,6 +701,46 @@ function App() {
                             path="/admin/custom-invoice"
                             role="admin"
                             component={AdminCustomInvoicePage}
+                          />
+                        )}
+                      </Route>
+
+                      <Route path="/admin/distributors/create">
+                        {() => (
+                          <ProtectedRoute
+                            path="/admin/distributors/create"
+                            role="admin"
+                            component={CreateDistributorPage}
+                          />
+                        )}
+                      </Route>
+
+                      <Route path="/admin/distributor-applications">
+                        {() => (
+                          <ProtectedRoute
+                            path="/admin/distributor-applications"
+                            role="admin"
+                            component={DistributorApplicationsPage}
+                          />
+                        )}
+                      </Route>
+
+                      <Route path="/admin/distributors/:id">
+                        {() => (
+                          <ProtectedRoute
+                            path="/admin/distributors/:id"
+                            role="admin"
+                            component={DistributorDetailsPage}
+                          />
+                        )}
+                      </Route>
+
+                      <Route path="/admin/distributors">
+                        {() => (
+                          <ProtectedRoute
+                            path="/admin/distributors"
+                            role="admin"
+                            component={DistributorsPage}
                           />
                         )}
                       </Route>
@@ -1259,6 +1305,17 @@ function App() {
                       {/* Seller notifications page */}
                       <Route path="/seller/notifications">
                         {() => <SellerNotificationsPage />}
+                      </Route>
+
+                      {/* Distributor Pages */}
+                      <Route path="/distributor/dashboard">
+                        {() => (
+                          <ProtectedRoute
+                            path="/distributor/dashboard"
+                            role="buyer"
+                            component={DistributorDashboard}
+                          />
+                        )}
                       </Route>
 
                       {/* Buyer Pages */}
