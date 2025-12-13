@@ -6,12 +6,12 @@
       "phases": {
         "install": {
           "cmds": [
-            "npm install --legacy-peer-deps"
+            "NODE_ENV=development npm install --legacy-peer-deps"
           ]
         },
         "build": {
           "cmds": [
-            "npm run build",
+            "NODE_ENV=development npm run build",
             "npm run build:chrome"
           ]
         }
@@ -19,6 +19,6 @@
     }
   },
   "deploy": {
-    "startCommand": "npm start"
+    "startCommand": "NODE_ENV=production npm start"
   }
 }
