@@ -55,7 +55,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CartContext, CartProvider, useCart } from "@/context/cart-context";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatDuration, formatReturnPolicy } from "@/lib/utils";
 import { WishlistButton } from "@/components/ui/wishlist-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProductReviews from "@/components/product/product-reviews";
@@ -1887,6 +1887,7 @@ export default function ProductDetailsPage() {
 
   return (
     <CartProvider>
+      {/* <div className="w-100 h-100 bg-red-500">Hello</div> */}
       <div className="bg-[#EADDCB] min-h-screen font-serif">
         {/* Product Header */}
         <div className="bg-[#EADDCB] mb-3">
@@ -1903,7 +1904,9 @@ export default function ProductDetailsPage() {
             {/* Left: Product Images (5/12) */}
             <div className="md:col-span-5 p-2 sm:p-4 border-b md:border-b-0 md:border-r border-gray-100">
               <SimpleImageSlider
-                key={`slider-${selectedVariant?.id || "main"}-${selectedColor || "nocolor"}`}
+                key={`slider-${selectedVariant?.id || "main"}-${
+                  selectedColor || "nocolor"
+                }`}
                 images={productImages}
                 name={product?.name || "Product"}
                 selectedVariantImages={selectedVariantImages}
@@ -1917,6 +1920,12 @@ export default function ProductDetailsPage() {
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
                 <h1 className="text-xl text-gray-800 font-medium break-words">
                   {product?.name}
+                  {product && product.weight && (
+                    <span className="text-sm text-gray-600 font-normal">
+                      <br></br>
+                      weight: {parseFloat(product?.weight)} kg
+                    </span>
+                  )}
                 </h1>
                 <div className="flex items-center gap-2 mt-2 sm:mt-0">
                   {product && (
@@ -2072,8 +2081,8 @@ export default function ProductDetailsPage() {
                           (selectedVariant?.stock
                             ? quantity >= selectedVariant.stock
                             : product?.stock
-                              ? quantity >= product.stock
-                              : false) ||
+                            ? quantity >= product.stock
+                            : false) ||
                           (selectedVariant
                             ? selectedVariant.stock <= 0
                             : (product?.stock ?? 0) <= 0)
@@ -2293,23 +2302,13 @@ export default function ProductDetailsPage() {
                   <div className="text-sm space-y-1">
                     <div className="flex items-center">
                       <TruckIcon className="h-4 w-4 text-primary mr-2" />
-                      <span>
-                        {Number(product?.returnPolicy) === 0
-                          ? "No Return Policy"
-                          : `${product?.returnPolicy} Days Return Policy`}
-                      </span>
+                      <span>{formatReturnPolicy(product?.returnPolicy)}</span>
                     </div>
                     {product?.warranty ? (
                       <div className="flex items-center">
                         <Shield className="h-4 w-4 text-primary mr-2" />
                         <span>
-                          {product.warranty && product.warranty > 0
-                            ? product.warranty % 12 === 0
-                              ? `${product.warranty / 12} ${
-                                  product.warranty / 12 === 1 ? "Year" : "Years"
-                                } Warranty`
-                              : `${product.warranty} Months Warranty`
-                            : "No Warranty"}
+                          {formatDuration(product?.warranty, "Shelf life")}
                         </span>
                       </div>
                     ) : null}
@@ -2330,7 +2329,13 @@ export default function ProductDetailsPage() {
                   <div className="text-primary text-sm font-medium">
                     {product?.sellerId ? (
                       <Link
-                        href={`/seller-products-listing/${product.sellerId}${product.sellerName ? `?sellerName=${encodeURIComponent(product.sellerName)}` : ""}`}
+                        href={`/seller-products-listing/${product.sellerId}${
+                          product.sellerName
+                            ? `?sellerName=${encodeURIComponent(
+                                product.sellerName
+                              )}`
+                            : ""
+                        }`}
                         className="hover:underline cursor-pointer text-blue-600"
                       >
                         {product?.sellerName ||
@@ -2368,8 +2373,8 @@ export default function ProductDetailsPage() {
                     {existingReminder
                       ? "REMINDER SET"
                       : isCreatingReminder
-                        ? "SETTING..."
-                        : "REMIND ME WHEN AVAILABLE"}
+                      ? "SETTING..."
+                      : "REMIND ME WHEN AVAILABLE"}
                   </Button>
                 ) : (
                   // Show normal add to cart button when in stock
@@ -2392,8 +2397,8 @@ export default function ProductDetailsPage() {
                     product.variants.length > 0
                       ? "SELECT OPTIONS"
                       : shouldShowGoToCart
-                        ? "GO TO CART"
-                        : "ADD TO CART"}
+                      ? "GO TO CART"
+                      : "ADD TO CART"}
                   </Button>
                 )}
 
@@ -2660,7 +2665,9 @@ export default function ProductDetailsPage() {
                                                     <img
                                                       key={imgIndex}
                                                       src={img}
-                                                      alt={`Variant ${index + 1}`}
+                                                      alt={`Variant ${
+                                                        index + 1
+                                                      }`}
                                                       className="w-8 h-8 object-cover rounded border"
                                                       onError={(e) => {
                                                         e.currentTarget.style.display =
