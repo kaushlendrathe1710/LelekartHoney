@@ -563,8 +563,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: seller.approved
           ? "Your seller account is approved. You can now list products and manage your store."
           : seller.rejected
-            ? "Your seller account has been rejected. Please contact customer support for more information."
-            : "Your profile is pending approval by admin. Please update your profile details ASAP so it can be approved quickly.",
+          ? "Your seller account has been rejected. Please contact customer support for more information."
+          : "Your profile is pending approval by admin. Please update your profile details ASAP so it can be approved quickly.",
       });
     } catch (error) {
       console.error("Error checking seller status:", error);
@@ -1031,17 +1031,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Group order items by seller
-      const itemsBySeller = orderItems.reduce(
-        (acc, item) => {
-          const sellerId = item.product.sellerId;
-          if (!acc[sellerId]) {
-            acc[sellerId] = [];
-          }
-          acc[sellerId].push(item);
-          return acc;
-        },
-        {} as Record<number, typeof orderItems>
-      );
+      const itemsBySeller = orderItems.reduce((acc, item) => {
+        const sellerId = item.product.sellerId;
+        if (!acc[sellerId]) {
+          acc[sellerId] = [];
+        }
+        acc[sellerId].push(item);
+        return acc;
+      }, {} as Record<number, typeof orderItems>);
 
       // Generate invoice for each seller
       const sellerInvoices = await Promise.all(
@@ -1861,7 +1858,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       console.log(
-        `Order ${newOrder.id} created for distributor ${distributor.id}, ledger updated with balance: ₹${newBalance / 100}`
+        `Order ${newOrder.id} created for distributor ${
+          distributor.id
+        }, ledger updated with balance: ₹${newBalance / 100}`
       );
 
       // Generate HTML using the same template as order invoices
@@ -3272,8 +3271,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         deletedParam === "only"
           ? "only"
           : deletedParam === "include"
-            ? "include"
-            : "exclude";
+          ? "include"
+          : "exclude";
 
       // If non-admin tries to include deleted, force exclude
       const isAdmin = req.isAuthenticated() && req.user.role === "admin";
@@ -3992,8 +3991,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (variantsToCreate.length > 0) {
         console.log(`Bulk creating ${variantsToCreate.length} new variants`);
         try {
-          const newVariants =
-            await storage.createProductVariantsBulk(variantsToCreate);
+          const newVariants = await storage.createProductVariantsBulk(
+            variantsToCreate
+          );
           console.log(`Successfully created ${newVariants.length} variants`);
           results.created = newVariants;
         } catch (error) {
@@ -4225,8 +4225,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           images: Array.isArray(productData.images)
             ? JSON.stringify(productData.images)
             : typeof productData.images === "string"
-              ? productData.images
-              : null,
+            ? productData.images
+            : null,
         };
 
         // Validate numeric fields
@@ -4288,26 +4288,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   typeof cleanVariant.price === "number"
                     ? cleanVariant.price
                     : typeof cleanVariant.price === "string"
-                      ? parseFloat(cleanVariant.price)
-                      : 0,
+                    ? parseFloat(cleanVariant.price)
+                    : 0,
                 mrp:
                   typeof cleanVariant.mrp === "number"
                     ? cleanVariant.mrp
                     : typeof cleanVariant.mrp === "string"
-                      ? parseFloat(cleanVariant.mrp)
-                      : null,
+                    ? parseFloat(cleanVariant.mrp)
+                    : null,
                 stock:
                   typeof cleanVariant.stock === "number"
                     ? cleanVariant.stock
                     : typeof cleanVariant.stock === "string"
-                      ? parseInt(cleanVariant.stock)
-                      : 0,
+                    ? parseInt(cleanVariant.stock)
+                    : 0,
                 // Ensure images is properly formatted as a JSON string
                 images: Array.isArray(cleanVariant.images)
                   ? JSON.stringify(cleanVariant.images)
                   : typeof cleanVariant.images === "string"
-                    ? cleanVariant.images
-                    : "[]",
+                  ? cleanVariant.images
+                  : "[]",
               };
             });
 
@@ -4317,8 +4317,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
 
             // Create all variants in bulk
-            createdVariants =
-              await storage.createProductVariantsBulk(cleanedVariants);
+            createdVariants = await storage.createProductVariantsBulk(
+              cleanedVariants
+            );
             console.log(
               "Successfully created variants:",
               createdVariants.length
@@ -4424,8 +4425,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           typeof productData.price === "number"
             ? productData.price
             : typeof productData.price === "string"
-              ? parseFloat(productData.price) || 0
-              : 0,
+            ? parseFloat(productData.price) || 0
+            : 0,
         // Handle dimension fields
         weight: productData.weight ? Number(productData.weight) : null,
         length: productData.length ? Number(productData.length) : null,
@@ -4440,8 +4441,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         images: Array.isArray(productData.images)
           ? JSON.stringify(productData.images)
           : typeof productData.images === "string"
-            ? productData.images
-            : null,
+          ? productData.images
+          : null,
       };
 
       // Validate numeric fields
@@ -4503,26 +4504,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 typeof cleanVariant.price === "number"
                   ? cleanVariant.price
                   : typeof cleanVariant.price === "string"
-                    ? parseFloat(cleanVariant.price)
-                    : 0,
+                  ? parseFloat(cleanVariant.price)
+                  : 0,
               mrp:
                 typeof cleanVariant.mrp === "number"
                   ? cleanVariant.mrp
                   : typeof cleanVariant.mrp === "string"
-                    ? parseFloat(cleanVariant.mrp)
-                    : null,
+                  ? parseFloat(cleanVariant.mrp)
+                  : null,
               stock:
                 typeof cleanVariant.stock === "number"
                   ? cleanVariant.stock
                   : typeof cleanVariant.stock === "string"
-                    ? parseInt(cleanVariant.stock)
-                    : 0,
+                  ? parseInt(cleanVariant.stock)
+                  : 0,
               // Ensure images is properly formatted as a JSON string
               images: Array.isArray(cleanVariant.images)
                 ? JSON.stringify(cleanVariant.images)
                 : typeof cleanVariant.images === "string"
-                  ? cleanVariant.images
-                  : "[]",
+                ? cleanVariant.images
+                : "[]",
             };
           });
 
@@ -4532,8 +4533,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
 
           // Create all variants in bulk
-          createdVariants =
-            await storage.createProductVariantsBulk(cleanedVariants);
+          createdVariants = await storage.createProductVariantsBulk(
+            cleanedVariants
+          );
           console.log(
             "Successfully created draft variants:",
             createdVariants.length
@@ -4677,9 +4679,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             typeof actualProductData.gstRate === "number"
               ? actualProductData.gstRate
               : typeof actualProductData.gstRate === "string" &&
-                  actualProductData.gstRate !== ""
-                ? parseFloat(actualProductData.gstRate)
-                : null;
+                actualProductData.gstRate !== ""
+              ? parseFloat(actualProductData.gstRate)
+              : null;
 
           console.log("Processed GST rate:", processedProductData.gstRate);
         }
@@ -4909,8 +4911,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   stock: Number(variantWithoutId.stock) || 0,
                 };
 
-                const newVariant =
-                  await storage.createProductVariant(validVariant);
+                const newVariant = await storage.createProductVariant(
+                  validVariant
+                );
                 console.log(
                   `Successfully created new variant with ID: ${newVariant.id}`
                 );
@@ -5741,7 +5744,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(
-        `Bulk deleting cart items: ${validIds.join(", ")} for user ${req.user.id}`
+        `Bulk deleting cart items: ${validIds.join(", ")} for user ${
+          req.user.id
+        }`
       );
 
       // Remove each item if it belongs to the user
@@ -6399,17 +6404,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Group items by seller
-      const itemsBySeller = itemsToProcess.reduce(
-        (acc, item) => {
-          const sellerId = isBuyNow ? item.sellerId : item.product.sellerId;
-          if (!acc[sellerId]) {
-            acc[sellerId] = [];
-          }
-          acc[sellerId].push(item);
-          return acc as Record<number, typeof itemsToProcess>;
-        },
-        {} as Record<number, typeof itemsToProcess>
-      );
+      const itemsBySeller = itemsToProcess.reduce((acc, item) => {
+        const sellerId = isBuyNow ? item.sellerId : item.product.sellerId;
+        if (!acc[sellerId]) {
+          acc[sellerId] = [];
+        }
+        acc[sellerId].push(item);
+        return acc as Record<number, typeof itemsToProcess>;
+      }, {} as Record<number, typeof itemsToProcess>);
 
       console.log(
         `Cart items grouped by seller: ${
@@ -6424,8 +6426,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const price = isBuyNow
               ? item.price
               : item.variant
-                ? item.variant.price
-                : item.product.price;
+              ? item.variant.price
+              : item.product.price;
             return acc + price * item.quantity;
           }, 0);
           return {
@@ -6628,8 +6630,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const price = isBuyNow
           ? item.price
           : item.variant
-            ? item.variant.price
-            : item.product.price;
+          ? item.variant.price
+          : item.product.price;
         const productId = isBuyNow ? item.productId : item.product.id;
         const variantId = isBuyNow ? item.variantId : item.variant?.id || null;
 
@@ -6694,8 +6696,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
 
           try {
-            const sellerOrder =
-              await storage.createSellerOrder(sellerOrderData);
+            const sellerOrder = await storage.createSellerOrder(
+              sellerOrderData
+            );
             console.log(
               `Created seller order ${sellerOrder.id} for seller ${sellerId}`
             );
@@ -6914,7 +6917,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isSellerItem: item.product.sellerId === req.user.id,
         }));
         console.log(
-          `Retrieved ${orderItems.length} order items for seller ${req.user.id} from order #${orderId}, ${orderItems.filter((item) => item.isSellerItem).length} are seller's items`
+          `Retrieved ${orderItems.length} order items for seller ${
+            req.user.id
+          } from order #${orderId}, ${
+            orderItems.filter((item) => item.isSellerItem).length
+          } are seller's items`
         );
       } else {
         // For buyers and admins, show all items for this specific order
@@ -7358,7 +7365,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { sendNotificationToUser } = await import("./websocket");
         await sendNotificationToUser(order.userId, {
           type: "ORDER_STATUS",
-          title: `Order #${id} ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+          title: `Order #${id} ${
+            status.charAt(0).toUpperCase() + status.slice(1)
+          }`,
           message: `Your order #${id} status has been updated to ${status}.`,
           read: false,
           link: `/orders/${id}`,
@@ -7658,8 +7667,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         deletedParam === "only"
           ? "only"
           : deletedParam === "include"
-            ? "include"
-            : "exclude";
+          ? "include"
+          : "exclude";
 
       const users = await storage.getUsers(deletedFilter);
       res.json(users);
@@ -9213,44 +9222,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const gstRate = row["GST"]
               ? parseFloat(row["GST"])
               : row["gst"]
-                ? parseFloat(row["gst"])
-                : row["gstRate"]
-                  ? parseFloat(row["gstRate"])
-                  : null;
+              ? parseFloat(row["gst"])
+              : row["gstRate"]
+              ? parseFloat(row["gstRate"])
+              : null;
 
             // Handle dimensions and weight - improved version using exactly the same pattern as GST
             // Declared without const to avoid duplication with the variables from getDimensionValue
             let weightVal = row["Weight"]
               ? parseFloat(row["Weight"])
               : row["weight"]
-                ? parseFloat(row["weight"])
-                : row["WEIGHT"]
-                  ? parseFloat(row["WEIGHT"])
-                  : 0;
+              ? parseFloat(row["weight"])
+              : row["WEIGHT"]
+              ? parseFloat(row["WEIGHT"])
+              : 0;
 
             let lengthVal = row["Length"]
               ? parseFloat(row["Length"])
               : row["length"]
-                ? parseFloat(row["length"])
-                : row["LENGTH"]
-                  ? parseFloat(row["LENGTH"])
-                  : 0;
+              ? parseFloat(row["length"])
+              : row["LENGTH"]
+              ? parseFloat(row["LENGTH"])
+              : 0;
 
             let widthVal = row["Width"]
               ? parseFloat(row["Width"])
               : row["width"]
-                ? parseFloat(row["width"])
-                : row["WIDTH"]
-                  ? parseFloat(row["WIDTH"])
-                  : 0;
+              ? parseFloat(row["width"])
+              : row["WIDTH"]
+              ? parseFloat(row["WIDTH"])
+              : 0;
 
             let heightVal = row["Height"]
               ? parseFloat(row["Height"])
               : row["height"]
-                ? parseFloat(row["height"])
-                : row["HEIGHT"]
-                  ? parseFloat(row["HEIGHT"])
-                  : 0;
+              ? parseFloat(row["height"])
+              : row["HEIGHT"]
+              ? parseFloat(row["HEIGHT"])
+              : 0;
 
             // Use these values directly in the dimensions object
             let dimensions = {
@@ -9708,8 +9717,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.query.active === "true"
           ? true
           : req.query.active === "false"
-            ? false
-            : undefined;
+          ? false
+          : undefined;
 
       const banners = await storage.getBanners(active);
       res.json(banners);
@@ -12503,8 +12512,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: seller.approved
           ? "Your seller account is approved. You can now list products and manage your store."
           : seller.rejected
-            ? "Your seller account has been rejected. Please contact customer support for more information."
-            : "Your seller account is pending approval. Please wait for an admin to review your application.",
+          ? "Your seller account has been rejected. Please contact customer support for more information."
+          : "Your seller account is pending approval. Please wait for an admin to review your application.",
       });
     } catch (error) {
       console.error("Error checking seller status:", error);
@@ -14179,7 +14188,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(
         "Request files:",
         req.files
-          ? `Found ${Array.isArray(req.files) ? req.files.length : "unknown"} files`
+          ? `Found ${
+              Array.isArray(req.files) ? req.files.length : "unknown"
+            } files`
           : "No files found"
       );
 
@@ -14189,7 +14200,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const user = req.user;
       console.log(
-        `User: ${user.username}, Role: ${user.role}, Co-Admin: ${user.isCoAdmin ? "Yes" : "No"}`
+        `User: ${user.username}, Role: ${user.role}, Co-Admin: ${
+          user.isCoAdmin ? "Yes" : "No"
+        }`
       );
 
       // Only admin, co-admin, or sellers can upload to the media library
@@ -14246,7 +14259,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
           // Return the S3 or storage error to the frontend for debugging
           return res.status(500).json({
-            error: `Failed to upload file: ${file.originalname}. ${fileError instanceof Error ? fileError.message : fileError}`,
+            error: `Failed to upload file: ${file.originalname}. ${
+              fileError instanceof Error ? fileError.message : fileError
+            }`,
           });
         }
       }
@@ -14925,7 +14940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     <!-- Fixed Header Section with proper alignment -->
     <div class="invoice-header">
       <div class="header-left">
-        <img src="${logoBase64}" alt="Papa Honey Logo" class="invoice-logo">
+        <img src="${logoBase64}" alt="KRPL Logo" class="invoice-logo">
       </div>
       
       <div class="header-right">
@@ -14962,6 +14977,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           <div>{{user.email}}</div>
           <div>Address details not available</div>
         {{/if}}
+        <div>GST Number: {{buyer.gstNumber}}</div>
       </div>
       <div class="ship-to">
         <div class="bold">Shipping Address</div>
@@ -14976,6 +14992,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           <div>{{user.email}}</div>
           <div>Address details not available</div>
         {{/if}}
+        <div>GST Number: {{buyer.gstNumber}}</div>
       </div>
     </div>
     
@@ -15077,11 +15094,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       <div style="padding: 12px; font-size: 10px; line-height: 1.4; color: #333; background-color: #f9f9f9; border-top: 1px solid #000; margin-top: 2px; max-width: 800px;">
         <div style="display: flex; justify-content: space-between; gap: 20px;">
           <div style="flex: 1; padding-right: 15px;">
-            <div style="font-weight: bold; font-size: 11px; margin-bottom: 6px; color: #2c3e50;">Declaration</div>
-            <div style="margin-bottom: 12px; text-align: justify;">The goods sold as part of this shipment are intended for end-user consumption and are not for retail sale distribution.</div>
+
             
             <div style="font-weight: bold; font-size: 11px; margin-bottom: 6px; color: #2c3e50;">Return Policy:</div>
-            <div style="text-align: justify;">If the item is defective or not as described, you may return it during delivery. You may also request a return within 02 days of delivery for defective items or items different from what you ordered. All returned items must be complete with freebies, undamaged, and unopened if returned for being different from what was ordered according to our policy.</div>
+            <div style="text-align: justify;"> All returned items must be complete with freebies, undamaged, and unopened if returned for being different from what was ordered according to our policy.</div>
           </div>
           
           <div style="flex: 1; padding-left: 15px;">
@@ -15089,7 +15105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             <div style="margin-bottom: 12px; text-align: justify;">Building no 2072, Chandigarh Royale City, Bollywood Gully Banur, SAS Nagar, Mohali, Punjab, India - 140601</div>
             
             <div style="font-weight: bold; font-size: 11px; margin-bottom: 6px; color: #2c3e50;">Contact us</div>
-            <div style="text-align: justify;">For any questions, please call our customer care at +91 98774 54036. You can also use the Contact Us section in our App or visit www.lelekart.com/Contact-us for assistance and support regarding your orders.</div>
+            <div style="text-align: justify;">For any questions, please call our customer care at +91 98774 54036. You can also use the Contact Us section in our App or visit krpl.lelekart.com/contact for assistance and support regarding your orders.</div>
           </div>
         </div>
     </div>
