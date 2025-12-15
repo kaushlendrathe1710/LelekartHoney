@@ -14968,7 +14968,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           </tr>
           <tr>
             <td class="label-col bold">Invoice No:</td>
-            <td class="value-col">LK-{{order.id}}</td>
+            <td class="value-col">PPH-{{order.id}}</td>
           </tr>
           <tr>
             <td class="label-col bold">Order No:</td>
@@ -15088,33 +15088,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
           <div class="bold">(Authorized Signatory)</div>
         </div>
       </div>
-      
+
       <!-- Declaration section inside container -->
       <div style="padding: 12px; font-size: 10px; line-height: 1.4; color: #333; background-color: #f9f9f9; border-top: 1px solid #000; margin-top: 2px; max-width: 800px;">
 
         <!-- Top Row -->
         <div style="display: flex; justify-content: space-between; gap: 20px;">
 
-          <!-- Registered Office (Left) -->
+          <!-- (Left) -->
           <div style="flex: 1; padding-right: 15px;">
-            <div style="font-weight: bold; font-size: 11px; margin-bottom: 6px; color: #2c3e50;">
-              Regd. Office
-            </div>
-            <div style="text-align: justify;">
-              Building no 2072, Chandigarh Royale City, Bollywood Gully Banur, SAS Nagar, Mohali, Punjab, India - 140601
-            </div>
-          </div>
-
-          <!-- Return Policy (Right) -->
-          <div style="flex: 1; padding-left: 15px;">
-            <div style="font-weight: bold; font-size: 11px; margin-bottom: 6px; color: #2c3e50;">
-              Contact Us:
+            <div style="font-weight: bold; font-size: 11px; color: #2c3e50;">
+              Contact Us
             </div>
             <div style="text-align: justify;">
               For any questions, please call our customer care at +91 98774 54036. You can also use the Contact Us section in our App or visit krpl.lelekart.com/contact for assistance and support regarding your orders.
             </div>
           </div>
+
+          <!-- (Right) -->
+          <div style="flex: 1; padding-left: 15px;">
+            <div style="font-weight: bold; font-size: 11px; color: #2c3e50;">
+              Legal Jurisdiction
+            </div>
+            <div style="text-align: justify; margin-bottom: 6px;">
+              All disputes are subject to Mohali, SAS Nagar Punjab jurisdiction only.
+            </div>
+            <div style="font-weight: bold; font-size: 11px; color: #2c3e50;">
+              Returns & Claims
+            </div>
+            <div style="text-align: justify; margin-bottom: 6px;">
+              Goods once sold will not be taken back.
+            </div>
+          </div>
         </div>
+        <!-- Middle Row -->
+        <div style="display: flex; justify-content: space-between; gap: 20px;">
+
+          <!-- (Left) -->
+          <div style="flex: 1; padding-right: 15px;">
+            <div style="font-weight: bold; font-size: 11px; color: #2c3e50;">
+              Delivery & Shipping
+            </div>
+            <div style="text-align: justify;">
+              Delivery timelines vary based on order volume. We are not liable for delays caused by transport/logistics partners.
+            </div>
+          </div>
+
+          <!-- (Right) -->
+          <div style="flex: 1; padding-left: 15px;">
+            <div style="font-weight: bold; font-size: 11px; color: #2c3e50;">
+              Regd. Office
+            </div>
+            <div style="text-align: justify;">
+              Building no 2072, Chandigarh Royale City, Bollywood Gully Banur, SAS Nagar, Punjab, India - 140601
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:center; align-items:center; font-weight:bold; margin-top:10px;">Thank you for doing business with us</div>
       </div>
     </div>
   </div>
