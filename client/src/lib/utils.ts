@@ -51,3 +51,22 @@ export const formatReturnPolicy = (
 
   return `${days} ${days === 1 ? "Day" : "Days"} Return Policy`;
 };
+
+// parses specifications from a string format to an array of key-value pairs
+export const parseSpecifications = (specs?: string): {
+  key: string;
+  value: string;
+}[] => {
+  if (!specs) return [];
+
+  return specs
+    .split("\n\n") // split by blank line
+    .map((line) => {
+      const [key, ...rest] = line.split(":");
+      return {
+        key: key?.trim(),
+        value: rest.join(":").trim(), // handles values containing :
+      };
+    })
+    .filter((spec) => spec.key && spec.value);
+};

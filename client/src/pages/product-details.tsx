@@ -55,7 +55,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CartContext, CartProvider, useCart } from "@/context/cart-context";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { formatPrice, formatDuration, formatReturnPolicy } from "@/lib/utils";
+import { formatPrice, formatDuration, formatReturnPolicy, parseSpecifications } from "@/lib/utils";
 import { WishlistButton } from "@/components/ui/wishlist-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProductReviews from "@/components/product/product-reviews";
@@ -1509,55 +1509,6 @@ export default function ProductDetailsPage() {
     }
   }, [selectedColor, selectedSize, quantity]);
 
-  // Parse specifications string into structured data
-  const parseSpecifications = (specs?: string | null) => {
-    // Create base specifications array
-    let result: { key: string; value: string }[] = [];
-
-    // Add GST information to specifications if available
-    if (
-      product?.gstDetails &&
-      product.gstDetails.gstRate &&
-      typeof product.gstDetails.gstRate === "string" &&
-      parseFloat(product.gstDetails.gstRate) > 0
-    ) {
-      result.push({ key: "GST Rate", value: `${product.gstDetails.gstRate}%` });
-
-      if (product.gstDetails.basePrice !== undefined) {
-        result.push({
-          key: "Base Price",
-          value: `₹${product.gstDetails.basePrice.toLocaleString("en-IN")}`,
-        });
-      }
-
-      if (product.gstDetails.gstAmount !== undefined) {
-        result.push({
-          key: "GST Amount",
-          value: `₹${product.gstDetails.gstAmount.toLocaleString("en-IN")}`,
-        });
-      }
-    }
-
-    // Check if specs is HTML format (from rich text editor)
-    if (
-      specs &&
-      (specs.includes("<p>") || specs.includes("<h") || specs.includes("<ul>"))
-    ) {
-      // It's already HTML formatted, no need to parse
-      return result;
-    }
-
-    // Parse product specifications if available and not HTML formatted
-    if (specs) {
-      const parsedSpecs = specs.split("|").map((spec) => {
-        const [key, value] = spec.split(":").map((s) => s.trim());
-        return { key, value: value || "" };
-      });
-      result = [...result, ...parsedSpecs];
-    }
-
-    return result;
-  };
 
   // Process images for the product - with a simplified approach
   // When variant images are provided, use ONLY those
@@ -1853,10 +1804,10 @@ export default function ProductDetailsPage() {
   // Process images, specifications, price details, colors and sizes
   const productImages = getProductImages(product, selectedVariantImages);
 
-  const specifications = parseSpecifications(product?.specifications);
+  const specifications = parseSpecifications(product?.specifications || undefined);
   const priceDetails = getPriceDetails(product);
   const { price, discount, original, hasGst, gstRate, basePrice, gstAmount } =
-    priceDetails;
+    priceDetails; 
 
   // Parse color and size options
   const colorOptions =
@@ -2476,7 +2427,7 @@ export default function ProductDetailsPage() {
                             {product?.weight !== undefined &&
                             product?.weight !== null &&
                             product?.weight !== ""
-                              ? `${product.weight} g`
+                              ? `${parseFloat(product.weight)} kg`
                               : "No information available"}
                           </td>
                         </tr>
@@ -2515,38 +2466,33 @@ export default function ProductDetailsPage() {
                         className="text-gray-700"
                       />
                     </div>
-                  ) : (
+                  ) : specifications.length > 0 ? (
                     <div className="border rounded overflow-x-auto">
                       <div className="bg-gray-50 p-3 border-b">
                         <h4 className="font-medium">General</h4>
                       </div>
-                      <div className="p-0">
-                        <table className="w-full min-w-[350px]">
-                          <tbody>
-                            {Array.isArray(specifications)
-                              ? specifications.map((spec, index) => (
-                                  <tr
-                                    key={index}
-                                    className={
-                                      index % 2 === 0
-                                        ? "bg-white"
-                                        : "bg-gray-50"
-                                    }
-                                  >
-                                    <td className="p-3 border-b border-gray-200 w-1/3 text-gray-600">
-                                      {spec.key}
-                                    </td>
-                                    <td className="p-3 border-b border-gray-200">
-                                      {spec.value}
-                                    </td>
-                                  </tr>
-                                ))
-                              : null}
-                          </tbody>
-                        </table>
-                      </div>
+
+                      <table className="w-full min-w-[350px]">
+                        <tbody>
+                          {specifications.map((spec, index) => (
+                            <tr
+                              key={index}
+                              className={
+                                index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                              }
+                            >
+                              <td className="p-3 border-b border-gray-200 w-1/3 text-gray-600 font-medium">
+                                {spec.key}
+                              </td>
+                              <td className="p-3 border-b border-gray-200 text-gray-800">
+                                {spec.value}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
+                  ) : null}
                 </TabsContent>
 
                 <TabsContent value="variants" className="p-2">

@@ -563,8 +563,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: seller.approved
           ? "Your seller account is approved. You can now list products and manage your store."
           : seller.rejected
-            ? "Your seller account has been rejected. Please contact customer support for more information."
-            : "Your profile is pending approval by admin. Please update your profile details ASAP so it can be approved quickly.",
+          ? "Your seller account has been rejected. Please contact customer support for more information."
+          : "Your profile is pending approval by admin. Please update your profile details ASAP so it can be approved quickly.",
       });
     } catch (error) {
       console.error("Error checking seller status:", error);
@@ -1031,17 +1031,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Group order items by seller
-      const itemsBySeller = orderItems.reduce(
-        (acc, item) => {
-          const sellerId = item.product.sellerId;
-          if (!acc[sellerId]) {
-            acc[sellerId] = [];
-          }
-          acc[sellerId].push(item);
-          return acc;
-        },
-        {} as Record<number, typeof orderItems>
-      );
+      const itemsBySeller = orderItems.reduce((acc, item) => {
+        const sellerId = item.product.sellerId;
+        if (!acc[sellerId]) {
+          acc[sellerId] = [];
+        }
+        acc[sellerId].push(item);
+        return acc;
+      }, {} as Record<number, typeof orderItems>);
 
       // Generate invoice for each seller
       const sellerInvoices = await Promise.all(
@@ -1861,7 +1858,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       console.log(
-        `Order ${newOrder.id} created for distributor ${distributor.id}, ledger updated with balance: ₹${newBalance / 100}`
+        `Order ${newOrder.id} created for distributor ${
+          distributor.id
+        }, ledger updated with balance: ₹${newBalance / 100}`
       );
 
       // Generate HTML using the same template as order invoices
@@ -3272,8 +3271,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         deletedParam === "only"
           ? "only"
           : deletedParam === "include"
-            ? "include"
-            : "exclude";
+          ? "include"
+          : "exclude";
 
       // If non-admin tries to include deleted, force exclude
       const isAdmin = req.isAuthenticated() && req.user.role === "admin";
@@ -3992,8 +3991,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (variantsToCreate.length > 0) {
         console.log(`Bulk creating ${variantsToCreate.length} new variants`);
         try {
-          const newVariants =
-            await storage.createProductVariantsBulk(variantsToCreate);
+          const newVariants = await storage.createProductVariantsBulk(
+            variantsToCreate
+          );
           console.log(`Successfully created ${newVariants.length} variants`);
           results.created = newVariants;
         } catch (error) {
@@ -4225,8 +4225,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           images: Array.isArray(productData.images)
             ? JSON.stringify(productData.images)
             : typeof productData.images === "string"
-              ? productData.images
-              : null,
+            ? productData.images
+            : null,
         };
 
         // Validate numeric fields
@@ -4288,26 +4288,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   typeof cleanVariant.price === "number"
                     ? cleanVariant.price
                     : typeof cleanVariant.price === "string"
-                      ? parseFloat(cleanVariant.price)
-                      : 0,
+                    ? parseFloat(cleanVariant.price)
+                    : 0,
                 mrp:
                   typeof cleanVariant.mrp === "number"
                     ? cleanVariant.mrp
                     : typeof cleanVariant.mrp === "string"
-                      ? parseFloat(cleanVariant.mrp)
-                      : null,
+                    ? parseFloat(cleanVariant.mrp)
+                    : null,
                 stock:
                   typeof cleanVariant.stock === "number"
                     ? cleanVariant.stock
                     : typeof cleanVariant.stock === "string"
-                      ? parseInt(cleanVariant.stock)
-                      : 0,
+                    ? parseInt(cleanVariant.stock)
+                    : 0,
                 // Ensure images is properly formatted as a JSON string
                 images: Array.isArray(cleanVariant.images)
                   ? JSON.stringify(cleanVariant.images)
                   : typeof cleanVariant.images === "string"
-                    ? cleanVariant.images
-                    : "[]",
+                  ? cleanVariant.images
+                  : "[]",
               };
             });
 
@@ -4317,8 +4317,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
 
             // Create all variants in bulk
-            createdVariants =
-              await storage.createProductVariantsBulk(cleanedVariants);
+            createdVariants = await storage.createProductVariantsBulk(
+              cleanedVariants
+            );
             console.log(
               "Successfully created variants:",
               createdVariants.length
@@ -4424,8 +4425,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           typeof productData.price === "number"
             ? productData.price
             : typeof productData.price === "string"
-              ? parseFloat(productData.price) || 0
-              : 0,
+            ? parseFloat(productData.price) || 0
+            : 0,
         // Handle dimension fields
         weight: productData.weight ? Number(productData.weight) : null,
         length: productData.length ? Number(productData.length) : null,
@@ -4440,8 +4441,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         images: Array.isArray(productData.images)
           ? JSON.stringify(productData.images)
           : typeof productData.images === "string"
-            ? productData.images
-            : null,
+          ? productData.images
+          : null,
       };
 
       // Validate numeric fields
@@ -4503,26 +4504,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 typeof cleanVariant.price === "number"
                   ? cleanVariant.price
                   : typeof cleanVariant.price === "string"
-                    ? parseFloat(cleanVariant.price)
-                    : 0,
+                  ? parseFloat(cleanVariant.price)
+                  : 0,
               mrp:
                 typeof cleanVariant.mrp === "number"
                   ? cleanVariant.mrp
                   : typeof cleanVariant.mrp === "string"
-                    ? parseFloat(cleanVariant.mrp)
-                    : null,
+                  ? parseFloat(cleanVariant.mrp)
+                  : null,
               stock:
                 typeof cleanVariant.stock === "number"
                   ? cleanVariant.stock
                   : typeof cleanVariant.stock === "string"
-                    ? parseInt(cleanVariant.stock)
-                    : 0,
+                  ? parseInt(cleanVariant.stock)
+                  : 0,
               // Ensure images is properly formatted as a JSON string
               images: Array.isArray(cleanVariant.images)
                 ? JSON.stringify(cleanVariant.images)
                 : typeof cleanVariant.images === "string"
-                  ? cleanVariant.images
-                  : "[]",
+                ? cleanVariant.images
+                : "[]",
             };
           });
 
@@ -4532,8 +4533,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
 
           // Create all variants in bulk
-          createdVariants =
-            await storage.createProductVariantsBulk(cleanedVariants);
+          createdVariants = await storage.createProductVariantsBulk(
+            cleanedVariants
+          );
           console.log(
             "Successfully created draft variants:",
             createdVariants.length
@@ -4677,9 +4679,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             typeof actualProductData.gstRate === "number"
               ? actualProductData.gstRate
               : typeof actualProductData.gstRate === "string" &&
-                  actualProductData.gstRate !== ""
-                ? parseFloat(actualProductData.gstRate)
-                : null;
+                actualProductData.gstRate !== ""
+              ? parseFloat(actualProductData.gstRate)
+              : null;
 
           console.log("Processed GST rate:", processedProductData.gstRate);
         }
@@ -4909,8 +4911,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   stock: Number(variantWithoutId.stock) || 0,
                 };
 
-                const newVariant =
-                  await storage.createProductVariant(validVariant);
+                const newVariant = await storage.createProductVariant(
+                  validVariant
+                );
                 console.log(
                   `Successfully created new variant with ID: ${newVariant.id}`
                 );
@@ -5741,7 +5744,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(
-        `Bulk deleting cart items: ${validIds.join(", ")} for user ${req.user.id}`
+        `Bulk deleting cart items: ${validIds.join(", ")} for user ${
+          req.user.id
+        }`
       );
 
       // Remove each item if it belongs to the user
@@ -6399,17 +6404,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Group items by seller
-      const itemsBySeller = itemsToProcess.reduce(
-        (acc, item) => {
-          const sellerId = isBuyNow ? item.sellerId : item.product.sellerId;
-          if (!acc[sellerId]) {
-            acc[sellerId] = [];
-          }
-          acc[sellerId].push(item);
-          return acc as Record<number, typeof itemsToProcess>;
-        },
-        {} as Record<number, typeof itemsToProcess>
-      );
+      const itemsBySeller = itemsToProcess.reduce((acc, item) => {
+        const sellerId = isBuyNow ? item.sellerId : item.product.sellerId;
+        if (!acc[sellerId]) {
+          acc[sellerId] = [];
+        }
+        acc[sellerId].push(item);
+        return acc as Record<number, typeof itemsToProcess>;
+      }, {} as Record<number, typeof itemsToProcess>);
 
       console.log(
         `Cart items grouped by seller: ${
@@ -6424,8 +6426,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const price = isBuyNow
               ? item.price
               : item.variant
-                ? item.variant.price
-                : item.product.price;
+              ? item.variant.price
+              : item.product.price;
             return acc + price * item.quantity;
           }, 0);
           return {
@@ -6628,8 +6630,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const price = isBuyNow
           ? item.price
           : item.variant
-            ? item.variant.price
-            : item.product.price;
+          ? item.variant.price
+          : item.product.price;
         const productId = isBuyNow ? item.productId : item.product.id;
         const variantId = isBuyNow ? item.variantId : item.variant?.id || null;
 
@@ -6694,8 +6696,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
 
           try {
-            const sellerOrder =
-              await storage.createSellerOrder(sellerOrderData);
+            const sellerOrder = await storage.createSellerOrder(
+              sellerOrderData
+            );
             console.log(
               `Created seller order ${sellerOrder.id} for seller ${sellerId}`
             );
@@ -6914,7 +6917,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isSellerItem: item.product.sellerId === req.user.id,
         }));
         console.log(
-          `Retrieved ${orderItems.length} order items for seller ${req.user.id} from order #${orderId}, ${orderItems.filter((item) => item.isSellerItem).length} are seller's items`
+          `Retrieved ${orderItems.length} order items for seller ${
+            req.user.id
+          } from order #${orderId}, ${
+            orderItems.filter((item) => item.isSellerItem).length
+          } are seller's items`
         );
       } else {
         // For buyers and admins, show all items for this specific order
@@ -7358,7 +7365,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { sendNotificationToUser } = await import("./websocket");
         await sendNotificationToUser(order.userId, {
           type: "ORDER_STATUS",
-          title: `Order #${id} ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+          title: `Order #${id} ${
+            status.charAt(0).toUpperCase() + status.slice(1)
+          }`,
           message: `Your order #${id} status has been updated to ${status}.`,
           read: false,
           link: `/orders/${id}`,
@@ -7658,8 +7667,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         deletedParam === "only"
           ? "only"
           : deletedParam === "include"
-            ? "include"
-            : "exclude";
+          ? "include"
+          : "exclude";
 
       const users = await storage.getUsers(deletedFilter);
       res.json(users);
@@ -9213,44 +9222,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const gstRate = row["GST"]
               ? parseFloat(row["GST"])
               : row["gst"]
-                ? parseFloat(row["gst"])
-                : row["gstRate"]
-                  ? parseFloat(row["gstRate"])
-                  : null;
+              ? parseFloat(row["gst"])
+              : row["gstRate"]
+              ? parseFloat(row["gstRate"])
+              : null;
 
             // Handle dimensions and weight - improved version using exactly the same pattern as GST
             // Declared without const to avoid duplication with the variables from getDimensionValue
             let weightVal = row["Weight"]
               ? parseFloat(row["Weight"])
               : row["weight"]
-                ? parseFloat(row["weight"])
-                : row["WEIGHT"]
-                  ? parseFloat(row["WEIGHT"])
-                  : 0;
+              ? parseFloat(row["weight"])
+              : row["WEIGHT"]
+              ? parseFloat(row["WEIGHT"])
+              : 0;
 
             let lengthVal = row["Length"]
               ? parseFloat(row["Length"])
               : row["length"]
-                ? parseFloat(row["length"])
-                : row["LENGTH"]
-                  ? parseFloat(row["LENGTH"])
-                  : 0;
+              ? parseFloat(row["length"])
+              : row["LENGTH"]
+              ? parseFloat(row["LENGTH"])
+              : 0;
 
             let widthVal = row["Width"]
               ? parseFloat(row["Width"])
               : row["width"]
-                ? parseFloat(row["width"])
-                : row["WIDTH"]
-                  ? parseFloat(row["WIDTH"])
-                  : 0;
+              ? parseFloat(row["width"])
+              : row["WIDTH"]
+              ? parseFloat(row["WIDTH"])
+              : 0;
 
             let heightVal = row["Height"]
               ? parseFloat(row["Height"])
               : row["height"]
-                ? parseFloat(row["height"])
-                : row["HEIGHT"]
-                  ? parseFloat(row["HEIGHT"])
-                  : 0;
+              ? parseFloat(row["height"])
+              : row["HEIGHT"]
+              ? parseFloat(row["HEIGHT"])
+              : 0;
 
             // Use these values directly in the dimensions object
             let dimensions = {
@@ -9708,8 +9717,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.query.active === "true"
           ? true
           : req.query.active === "false"
-            ? false
-            : undefined;
+          ? false
+          : undefined;
 
       const banners = await storage.getBanners(active);
       res.json(banners);
@@ -12503,8 +12512,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: seller.approved
           ? "Your seller account is approved. You can now list products and manage your store."
           : seller.rejected
-            ? "Your seller account has been rejected. Please contact customer support for more information."
-            : "Your seller account is pending approval. Please wait for an admin to review your application.",
+          ? "Your seller account has been rejected. Please contact customer support for more information."
+          : "Your seller account is pending approval. Please wait for an admin to review your application.",
       });
     } catch (error) {
       console.error("Error checking seller status:", error);
@@ -14179,7 +14188,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(
         "Request files:",
         req.files
-          ? `Found ${Array.isArray(req.files) ? req.files.length : "unknown"} files`
+          ? `Found ${
+              Array.isArray(req.files) ? req.files.length : "unknown"
+            } files`
           : "No files found"
       );
 
@@ -14189,7 +14200,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const user = req.user;
       console.log(
-        `User: ${user.username}, Role: ${user.role}, Co-Admin: ${user.isCoAdmin ? "Yes" : "No"}`
+        `User: ${user.username}, Role: ${user.role}, Co-Admin: ${
+          user.isCoAdmin ? "Yes" : "No"
+        }`
       );
 
       // Only admin, co-admin, or sellers can upload to the media library
@@ -14246,7 +14259,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
           // Return the S3 or storage error to the frontend for debugging
           return res.status(500).json({
-            error: `Failed to upload file: ${file.originalname}. ${fileError instanceof Error ? fileError.message : fileError}`,
+            error: `Failed to upload file: ${file.originalname}. ${
+              fileError instanceof Error ? fileError.message : fileError
+            }`,
           });
         }
       }
@@ -14594,7 +14609,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ]);
 
       // Generate QR code with invoice details
-      const qrData = `https://lelekart.in/orders/${data.order.id}`;
+      const qrData = `https://krpl.lelekart.in/orders/${data.order.id}`;
 
       const qrCodeDataUrl = await QRCode.toDataURL(qrData, {
         errorCorrectionLevel: "H",
@@ -14618,8 +14633,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Invoice template with fixed header alignment - Half A4 size
-      const invoiceTemplate = `<!DOCTYPE html>
+      const invoiceTemplate = `
+<!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="utf-8">
   <title>Tax Invoice</title>
@@ -14628,16 +14645,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       size: A4;
       margin: 3mm;
     }
-    
+
     /* Half A4 container - width is half of A4, height is full A4 */
     .half-a4-container {
-      width: 148.5mm; /* Half of A4 width (297mm) */
-      height: 210mm; /* A4 height */
+      width: 148.5mm;
+      /* Half of A4 width (297mm) */
+      height: 210mm;
+      /* A4 height */
       margin: 0 auto;
       position: relative;
       overflow: hidden;
     }
-    
+
     body {
       font-family: Arial, sans-serif;
       font-size: 9px;
@@ -14648,17 +14667,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
-    
+
     .container {
       width: 148.5mm;
-      height: auto; /* allow content-driven height to avoid extra bottom space */
+      height: auto;
+      /* allow content-driven height to avoid extra bottom space */
       margin: 0 auto;
       border: 1px solid #000;
       page-break-inside: avoid;
       overflow: visible;
       position: relative;
     }
-    
+
     .invoice-header {
       padding: 5px;
       background-color: #ffffff;
@@ -14670,30 +14690,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       box-sizing: border-box;
       height: 40px;
     }
-    
+
     .header-left {
       display: table-cell;
       width: 35%;
       vertical-align: top;
       padding-top: 5px;
     }
-    
+
     .header-right {
       display: table-cell;
       width: 65%;
       vertical-align: top;
       text-align: right;
     }
-    
-    .invoice-logo {
-      max-height: 50px;
-      margin-top: 2px;
-      height: 50px;
-      max-width: 120px;
-      object-fit: contain;
-      margin-bottom: 2px;
+
+    .logo-crop {
+      height: 70px;
+      width: 160px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
     }
-    
+
+    .invoice-logo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
     .invoice-title {
       font-weight: bold;
       font-size: 12px;
@@ -14701,32 +14726,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       margin: 0 0 5px 0;
       text-align: right;
     }
-    
+
     .header-info-table {
       border-collapse: collapse;
       float: right;
       clear: both;
       margin-top: 0;
     }
-    
+
     .header-info-table td {
       padding: 1px 0;
       font-size: 8px;
       line-height: 1.1;
     }
-    
+
     .header-info-table .label-col {
       text-align: left;
       padding-right: 8px;
       white-space: nowrap;
       min-width: 50px;
     }
-    
+
     .header-info-table .value-col {
       text-align: left;
       white-space: nowrap;
     }
-    
+
     .address-section {
       overflow: visible;
       font-size: 9px;
@@ -14734,23 +14759,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       page-break-inside: avoid;
       min-height: 60px;
     }
-    
-    .bill-to, .ship-to {
+
+    .bill-to,
+    .ship-to {
       width: 48%;
       padding: 4px;
       box-sizing: border-box;
       min-height: 50px;
       vertical-align: top;
     }
-    
+
     .bill-to {
       float: left;
     }
-    
+
     .ship-to {
       float: right;
     }
-    
+
     .business-section {
       overflow: visible;
       font-size: 9px;
@@ -14759,23 +14785,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       min-height: 50px;
       margin-bottom: 15px;
     }
-    
-    .bill-from, .ship-from {
+
+    .bill-from,
+    .ship-from {
       width: 48%;
       padding: 4px;
       box-sizing: border-box;
       min-height: 40px;
       vertical-align: top;
     }
-    
+
     .bill-from {
       float: left;
     }
-    
+
     .ship-from {
       float: right;
     }
-    
+
     table.items {
       width: 100%;
       border-collapse: collapse;
@@ -14784,7 +14811,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       page-break-inside: avoid;
       margin-top: 10px;
     }
-    
+
     table.items th {
       background-color: #f8f9fa;
       border: 1px solid #000;
@@ -14794,7 +14821,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       font-size: 8px;
       color: #2c3e50;
     }
-    
+
     table.items td {
       border: 1px solid #000;
       padding: 4px 3px;
@@ -14802,14 +14829,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       font-size: 8px;
       vertical-align: top;
     }
-    
+
     .description-cell {
       text-align: left !important;
       max-width: 90px;
       word-wrap: break-word;
       white-space: normal;
     }
-    
+
     .amount-in-words {
       margin: 0;
       padding: 4px;
@@ -14821,7 +14848,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       page-break-inside: avoid;
       min-height: 30px;
     }
-    
+
     .signature-section {
       background-color: #ffffff;
       padding: 4px;
@@ -14831,52 +14858,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       margin-bottom: 2px;
       min-height: 40px;
     }
-    
+
     .signature-content {
       width: 100%;
       overflow: hidden;
     }
-    
+
     .qr-section {
       float: left;
       width: 30%;
       text-align: left;
     }
-    
+
     .qr-section img,
     .qr-section svg {
       max-width: 35px;
       max-height: 35px;
     }
-    
+
     .signature-box {
       float: right;
-      width: 60%;
-      text-align: right;
+      width: 30%;
+      text-align: center;
       font-size: 8px;
       color: #2c3e50;
     }
-    
+
     .signature-box .bold {
       font-size: 9px;
       margin-bottom: 2px;
       font-weight: 600;
       color: #000000;
     }
-    
+
     .signature-box img {
       height: 20px;
-      margin: 3px 0;
+      margin: 3px auto;
       display: block;
       margin-left: auto;
       object-fit: contain;
     }
-    
+
     .bold {
       font-weight: 600;
       color: #2c3e50;
     }
-    
+
     .taxes-cell {
       font-size: 7px;
       line-height: 1.2;
@@ -14895,19 +14922,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      
+
       .container {
         page-break-inside: avoid;
       }
-      
+
       table.items {
         page-break-inside: avoid;
       }
-      
+
       .signature-section {
         page-break-inside: avoid;
       }
-      
+
       .header-info-table {
         page-break-inside: avoid;
       }
@@ -14920,17 +14947,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <!-- Fixed Header Section with proper alignment -->
     <div class="invoice-header">
       <div class="header-left">
-        <img src="${logoBase64}" alt="Papa Honey Logo" class="invoice-logo">
+        <div class="logo-crop">
+          <img src="${logoBase64}" alt="KRPL Logo" class="invoice-logo">
+        </div>
       </div>
-      
+
       <div class="header-right">
         <div class="invoice-title">Tax Invoice/Bill of Supply/Cash Memo</div>
-        
+
         <table class="header-info-table">
           <tr>
             <td class="label-col bold">Invoice Date:</td>
@@ -14947,7 +14977,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         </table>
       </div>
     </div>
-    
+
     <div class="address-section clearfix">
       <div class="bill-to">
         <div class="bold">Billing Address</div>
@@ -14955,13 +14985,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         {{#if order.shippingDetails}}
           <div>{{user.name}}</div>
           <div>{{order.shippingDetails.address}}</div>
-          {{#if order.shippingDetails.address2}}<div>{{order.shippingDetails.address2}}</div>{{/if}}
+          {{#if order.shippingDetails.address2}}
+            <div>{{order.shippingDetails.address2}}</div>
+          {{/if}}
           <div>{{order.shippingDetails.city}}, {{order.shippingDetails.state}} {{order.shippingDetails.zipCode}}</div>
         {{else}}
           <div>{{user.name}}</div>
           <div>{{user.email}}</div>
           <div>Address details not available</div>
         {{/if}}
+        <div>GST Number: {{buyer.gstNumber}}</div>
       </div>
       <div class="ship-to">
         <div class="bold">Shipping Address</div>
@@ -14969,53 +15002,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         {{#if order.shippingDetails}}
           <div>{{user.name}}</div>
           <div>{{order.shippingDetails.address}}</div>
-          {{#if order.shippingDetails.address2}}<div>{{order.shippingDetails.address2}}</div>{{/if}}
+          {{#if order.shippingDetails.address2}}
+            <div>{{order.shippingDetails.address2}}</div>
+          {{/if}}
           <div>{{order.shippingDetails.city}}, {{order.shippingDetails.state}} {{order.shippingDetails.zipCode}}</div>
         {{else}}
           <div>{{user.name}}</div>
           <div>{{user.email}}</div>
           <div>Address details not available</div>
         {{/if}}
+        <div>GST Number: {{buyer.gstNumber}}</div>
       </div>
     </div>
-    
+
     <div class="business-section clearfix">
       <div class="bill-from">
         <div class="bold">Bill From</div>
         <br>
-        {{#if seller.billingAddress}}
-          <div class="bold">{{seller.pickupAddress.businessName}}</div>
-          <div>{{seller.billingAddress.line1}}</div>
-          {{#if seller.billingAddress.line2}}<div>{{seller.billingAddress.line2}}</div>{{/if}}
-          <div>{{seller.billingAddress.city}}, {{seller.billingAddress.state}} {{seller.billingAddress.pincode}}</div>
-          <div>GSTIN: {{seller.taxInformation.gstin}}</div>
-          <div>PAN: {{seller.taxInformation.panNumber}}</div>
-        {{else}}
-          <div class="bold">{{seller.taxInformation.businessName}}</div>
-          <div>{{seller.address}}</div>
-          <div>Mumbai, Maharashtra 400001</div>
-          {{#if seller.taxInformation.gstin}}<div>GSTIN: {{seller.taxInformation.gstin}}</div>{{/if}}
-        {{/if}}
+        <div class="bold">Kaushal Ranjeet pvt. ltd.</div>
+        <div>Building no 2072, Chandigarh Royale City</div>
+        <div>Bollywood Gully</div>
+        <div>Banur SAS Nagar</div>
+        <div>140601</div>
+        <div>GST Number: 03AAICK9276F1ZC</div>
       </div>
       <div class="ship-from">
         <div class="bold">Ship From</div>
         <br>
-        {{#if seller.pickupAddress}}
-          <div class="bold">{{seller.pickupAddress.businessName}}</div>
-          <div>{{seller.pickupAddress.line1}}</div>
-          {{#if seller.pickupAddress.line2}}<div>{{seller.pickupAddress.line2}}</div>{{/if}}
-          <div>{{seller.pickupAddress.city}}, {{seller.pickupAddress.state}} {{seller.pickupAddress.pincode}}</div>
-          <div>GSTIN: {{seller.taxInformation.gstin}}</div>
-          <div>PAN: {{seller.taxInformation.panNumber}}</div>
-        {{else}}
-          <div class="bold">{{seller.taxInformation.businessName}}</div>
-          <div>Warehouse Address: {{seller.address}}</div>
-          <div>Mumbai, Maharashtra 400001</div>
-          {{#if seller.taxInformation.gstin}}<div>GSTIN: {{seller.taxInformation.gstin}}</div>{{/if}}
-        {{/if}}
+        <div class="bold">Kaushal Ranjeet pvt. ltd.</div>
+        <div>Building no 2072, Chandigarh Royale City</div>
+        <div>Bollywood Gully</div>
+        <div>Banur SAS Nagar</div>
+        <div>140601</div>
+        <div>GST Number: 03AAICK9276F1ZC</div>
       </div>
     </div>
-    
+
     <table class="items">
       <thead>
         <tr>
@@ -15032,26 +15054,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       </thead>
       <tbody>
         {{#each order.items}}
-        <tr>
-          <td>{{add @index 1}}</td>
-          <td class="description-cell">{{this.product.name}}</td>
-          <td>{{this.quantity}}</td>
-          <td>{{formatMoney (multiply this.product.mrp this.quantity)}}</td>
-          <td>{{formatMoney (multiply (subtract this.product.mrp this.price) this.quantity)}}</td>
-          <td>{{calculateTaxableValue this.price this.quantity this.product.gstRate}}</td>
-          <td class="taxes-cell">{{{calculateTaxes this.price this.quantity this.product.gstRate ../order.shippingDetails.state ../seller.pickupAddress.state}}}</td>
-          <td>{{#if this.product.deliveryCharges}}{{#if (gt this.product.deliveryCharges 0)}}₹{{multiply this.product.deliveryCharges this.quantity}}{{else}}Free{{/if}}{{else}}Free{{/if}}</td>
-          <td>{{formatMoney (add (multiply this.price this.quantity) (multiply this.product.deliveryCharges this.quantity))}}</td>
-        </tr>
+          <tr>
+            <td>{{add @index 1}}</td>
+            <td class="description-cell">{{this.product.name}}</td>
+            <td>{{this.quantity}}</td>
+            <td>{{formatMoney (multiply this.product.mrp this.quantity)}}</td>
+            <td>{{formatMoney (multiply (subtract this.product.mrp this.price) this.quantity)}}</td>
+            <td>{{calculateTaxableValue this.price this.quantity this.product.gstRate}}</td>
+            <td class="taxes-cell">{{{calculateTaxes this.price this.quantity this.product.gstRate ../order.shippingDetails.state ../seller.pickupAddress.state}}}</td>
+            <td>{{#if this.product.deliveryCharges}}{{#if (gt this.product.deliveryCharges 0)}}₹{{multiply this.product.deliveryCharges this.quantity}}{{else}}Free{{/if}}{{else}}Free{{/if}}</td>
+            <td>{{formatMoney (add (multiply this.price this.quantity) (multiply this.product.deliveryCharges this.quantity))}}</td>
+          </tr>
         {{/each}}
       </tbody>
     </table>
-    
+
     <div class="amount-in-words">
       <span class="bold">Amount in words:</span>
       <span style="font-style: italic; margin-left: 5px;">{{amountInWords total}} Only</span>
     </div>
-    
+
     <div class="signature-section">
       <div class="signature-content clearfix">
         <div class="qr-section">
@@ -15061,42 +15083,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
           </div>
         </div>
         <div class="signature-box">
-          {{#if seller.pickupAddress.businessName}}
-            <div class="bold">{{seller.pickupAddress.businessName}}</div>
-          {{else}}
-            <div class="bold">Lele Kart Retail Private Limited</div>
-          {{/if}}
-          <img 
-            src="${signatureBase64}"
-            alt="Authorized Signature"
-          />
-          <div class="bold">Authorized Signatory</div>
+          <img src="${signatureBase64}" alt="Authorized Signature" />
+          <div>KK</div>
+          <div class="bold">(Authorized Signatory)</div>
         </div>
       </div>
+      
       <!-- Declaration section inside container -->
       <div style="padding: 12px; font-size: 10px; line-height: 1.4; color: #333; background-color: #f9f9f9; border-top: 1px solid #000; margin-top: 2px; max-width: 800px;">
+
+        <!-- Top Row -->
         <div style="display: flex; justify-content: space-between; gap: 20px;">
+
+          <!-- Registered Office (Left) -->
           <div style="flex: 1; padding-right: 15px;">
-            <div style="font-weight: bold; font-size: 11px; margin-bottom: 6px; color: #2c3e50;">Declaration</div>
-            <div style="margin-bottom: 12px; text-align: justify;">The goods sold as part of this shipment are intended for end-user consumption and are not for retail sale distribution.</div>
-            
-            <div style="font-weight: bold; font-size: 11px; margin-bottom: 6px; color: #2c3e50;">Return Policy:</div>
-            <div style="text-align: justify;">If the item is defective or not as described, you may return it during delivery. You may also request a return within 02 days of delivery for defective items or items different from what you ordered. All returned items must be complete with freebies, undamaged, and unopened if returned for being different from what was ordered according to our policy.</div>
+            <div style="font-weight: bold; font-size: 11px; margin-bottom: 6px; color: #2c3e50;">
+              Regd. Office
+            </div>
+            <div style="text-align: justify;">
+              Building no 2072, Chandigarh Royale City, Bollywood Gully Banur, SAS Nagar, Mohali, Punjab, India - 140601
+            </div>
           </div>
-          
+
+          <!-- Return Policy (Right) -->
           <div style="flex: 1; padding-left: 15px;">
-            <div style="font-weight: bold; font-size: 11px; margin-bottom: 6px; color: #2c3e50;">Regd. Office</div>
-            <div style="margin-bottom: 12px; text-align: justify;">Building no 2072, Chandigarh Royale City, Bollywood Gully Banur, SAS Nagar, Mohali, Punjab, India - 140601</div>
-            
-            <div style="font-weight: bold; font-size: 11px; margin-bottom: 6px; color: #2c3e50;">Contact us</div>
-            <div style="text-align: justify;">For any questions, please call our customer care at +91 98774 54036. You can also use the Contact Us section in our App or visit www.lelekart.com/Contact-us for assistance and support regarding your orders.</div>
+            <div style="font-weight: bold; font-size: 11px; margin-bottom: 6px; color: #2c3e50;">
+              Contact Us:
+            </div>
+            <div style="text-align: justify;">
+              For any questions, please call our customer care at +91 98774 54036. You can also use the Contact Us section in our App or visit krpl.lelekart.com/contact for assistance and support regarding your orders.
+            </div>
           </div>
         </div>
-    </div>
+      </div>
     </div>
   </div>
 </body>
-</html>`;
+
+</html>
+`;
 
       handlebars.registerHelper("calculateTotal", function (items) {
         return items.reduce(
