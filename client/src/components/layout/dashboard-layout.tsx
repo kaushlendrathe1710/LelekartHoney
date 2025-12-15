@@ -19,6 +19,7 @@ import {
   Star,
   RefreshCcw,
   Upload,
+  Book,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -194,7 +195,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b bg-[#F8F5E4] px-4 shadow-md">
           <div className="flex h-full items-center justify-between">
             <div className="flex items-center gap-4">
-                              <SidebarTrigger className="text-black hover:bg-[#EADDCB] hover:text-black" />
+              <SidebarTrigger className="text-black hover:bg-[#EADDCB] hover:text-black" />
               <Link href="/" className="flex items-center">
                 <Logo />
               </Link>
@@ -265,8 +266,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         {user.role === "admin"
                           ? "Admin Account"
                           : user.role === "seller"
-                            ? "Seller Account"
-                            : "Buyer Account"}
+                          ? "Seller Account"
+                          : "Buyer Account"}
                       </p>
                     </div>
                   </div>
@@ -308,8 +309,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     {user.role === "admin"
                       ? "Admin Account"
                       : user.role === "seller"
-                        ? "Seller Account"
-                        : "Buyer Account"}
+                      ? "Seller Account"
+                      : "Buyer Account"}
                   </span>
                 </div>
               </div>
@@ -424,7 +425,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     <Button
                       variant="ghost"
                       asChild
-                      className={`w-full justify-start ${isActive("/buyer/dashboard") ? "bg-primary/10 text-primary" : ""}`}
+                      className={`w-full justify-start ${
+                        isActive("/buyer/dashboard")
+                          ? "bg-primary/10 text-primary"
+                          : ""
+                      }`}
                     >
                       <Link href="/buyer/dashboard">
                         <Star className="mr-2 h-4 w-4 text-yellow-500" />
@@ -595,6 +600,18 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   <Button
                     variant="ghost"
                     asChild
+                    className="w-full justify-start"
+                  >
+                    <Link href="/distributor/dashboard">
+                      <Book className="mr-2 h-4 w-4" />
+                      <span>Ledger</span>
+                    </Link>
+                  </Button>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <Button
+                    variant="ghost"
+                    asChild
                     className={`w-full justify-start ${
                       isActive("/buyer/settings")
                         ? "bg-primary/10 text-primary"
@@ -634,7 +651,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
             </SidebarFooter>
           </Sidebar>
-          <SidebarInset className="w-full p-4 md:p-6 bg-[#F8F5E4]">{children}</SidebarInset>
+          <SidebarInset className="w-full p-4 md:p-6 bg-[#F8F5E4]">
+            {children}
+          </SidebarInset>
         </div>
       </div>
     </SidebarProvider>
