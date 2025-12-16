@@ -660,56 +660,7 @@ export default function HomePage() {
           </div>
         )}
       </div>
-      {/* --- Featured Deals, Best Seller, Trending (3 columns in one row) --- */}
-      {/* <LazySection
-        fallback={<LazyLoadingFallback variant="cards" count={3} />}
-        threshold={0.2}
-        rootMargin="100px"
-      >
-        <Suspense fallback={<LazyLoadingFallback variant="cards" count={3} />}>
-          <FeaturedDealsSection featuredProducts={featuredProducts} />
-        </Suspense>
-      </LazySection> */}
-      {/* --- Under Price Sections (with visible box) --- */}
-      {/* <LazySection
-        fallback={<LazyLoadingFallback variant="cards" count={3} />}
-        threshold={0.2}
-        rootMargin="100px"
-      >
-        <Suspense fallback={<LazyLoadingFallback variant="cards" count={3} />}>
-          <UnderPriceSection
-            under199Data={under199Data}
-            under399Data={under399Data}
-            under599Data={under599Data}
-            isLoadingUnder199={isLoadingUnder199}
-            isLoadingUnder399={isLoadingUnder399}
-            isLoadingUnder599={isLoadingUnder599}
-          />
-        </Suspense>
-      </LazySection> */}
-      {/* --- Discount % Off Sections (third row, with visible box) --- */}
-      {/* <LazySection
-        fallback={<LazyLoadingFallback variant="cards" count={6} />}
-        threshold={0.2}
-        rootMargin="100px"
-      >
-        <Suspense fallback={<LazyLoadingFallback variant="cards" count={6} />}>
-          <DiscountSection
-            upTo20Data={upTo20Data}
-            upTo40Data={upTo40Data}
-            upTo60Data={upTo60Data}
-            discount20to40Data={discount20to40Data}
-            discount40to60Data={discount40to60Data}
-            discount60to80Data={discount60to80Data}
-            isLoadingUpTo20={isLoadingUpTo20}
-            isLoadingUpTo40={isLoadingUpTo40}
-            isLoadingUpTo60={isLoadingUpTo60}
-            isLoading20to40={isLoading20to40}
-            isLoading40to60={isLoading40to60}
-            isLoading60to80={isLoading60to80}
-          />
-        </Suspense>
-      </LazySection> */}
+
       {/* --- Recently Viewed Products --- */}
       <LazySection
         fallback={<LazyLoadingFallback variant="grid" count={5} />}

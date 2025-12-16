@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Search, AlertTriangle, X } from "lucide-react";
 import { ProductCard } from "@/components/ui/product-card";
@@ -12,31 +12,11 @@ import { Product } from "@shared/schema";
 import { Helmet } from "react-helmet-async";
 
 export default function SearchResultsPage() {
-  // Use state to track current URL parameters to ensure component re-renders
-  // when the URL changes but the component doesn't remount
-  const [urlParams, setUrlParams] = useState(
-    () => new URLSearchParams(window.location.search)
-  );
+  const [location, navigate] = useLocation();
+  
 
-  // Update URL parameters when component mounts or URL changes
-  React.useEffect(() => {
-    const handleUrlChange = () => {
-      setUrlParams(new URLSearchParams(window.location.search));
-    };
-
-    // Set up the initial parameters
-    handleUrlChange();
-
-    // Listen for URL changes
-    window.addEventListener("popstate", handleUrlChange);
-
-    // Clean up
-    return () => {
-      window.removeEventListener("popstate", handleUrlChange);
-    };
-  }, []);
-
-  // Get search parameters from URL params state variable
+  // Get search parameters directly from URL
+  const urlParams = new URLSearchParams(window.location.search);
   const queryParam = urlParams.get("q") || "";
   const categoryParam = urlParams.get("category");
   const minPriceParam = urlParams.get("minPrice");
@@ -232,9 +212,14 @@ export default function SearchResultsPage() {
                         size="icon"
                         className="h-5 w-5 ml-1 text-gray-500"
                         onClick={() => {
-                          const newParams = new URLSearchParams(urlParams);
+                          const newParams = new URLSearchParams(
+                            location.includes("?") ? location.split("?")[1] : ""
+                          );
+
                           newParams.delete("category");
-                          window.location.href = `/search?${newParams.toString()}`;
+                          navigate(`/search?${newParams.toString()}`, {
+                            replace: true,
+                          });
                         }}
                       >
                         <X className="h-3 w-3" />
@@ -253,9 +238,14 @@ export default function SearchResultsPage() {
                         size="icon"
                         className="h-5 w-5 ml-1 text-gray-500"
                         onClick={() => {
-                          const newParams = new URLSearchParams(urlParams);
+                          const newParams = new URLSearchParams(
+                            location.includes("?") ? location.split("?")[1] : ""
+                          );
+
                           newParams.delete("color");
-                          window.location.href = `/search?${newParams.toString()}`;
+                          navigate(`/search?${newParams.toString()}`, {
+                            replace: true,
+                          });
                         }}
                       >
                         <X className="h-3 w-3" />
@@ -274,9 +264,14 @@ export default function SearchResultsPage() {
                         size="icon"
                         className="h-5 w-5 ml-1 text-gray-500"
                         onClick={() => {
-                          const newParams = new URLSearchParams(urlParams);
+                          const newParams = new URLSearchParams(
+                            location.includes("?") ? location.split("?")[1] : ""
+                          );
+
                           newParams.delete("brand");
-                          window.location.href = `/search?${newParams.toString()}`;
+                          navigate(`/search?${newParams.toString()}`, {
+                            replace: true,
+                          });
                         }}
                       >
                         <X className="h-3 w-3" />
@@ -299,10 +294,15 @@ export default function SearchResultsPage() {
                         size="icon"
                         className="h-5 w-5 ml-1 text-gray-500"
                         onClick={() => {
-                          const newParams = new URLSearchParams(urlParams);
+                          const newParams = new URLSearchParams(
+                            location.includes("?") ? location.split("?")[1] : ""
+                          );
+
                           newParams.delete("minPrice");
                           newParams.delete("maxPrice");
-                          window.location.href = `/search?${newParams.toString()}`;
+                          navigate(`/search?${newParams.toString()}`, {
+                            replace: true,
+                          });
                         }}
                       >
                         <X className="h-3 w-3" />
@@ -328,15 +328,20 @@ export default function SearchResultsPage() {
                   className="text-sm border rounded px-2 py-1"
                   value={sortParam || "relevance"}
                   onChange={(e) => {
-                    const newParams = new URLSearchParams(urlParams);
+                    const newParams = new URLSearchParams(
+                      location.includes("?") ? location.split("?")[1] : ""
+                    );
+
                     if (e.target.value === "relevance") {
                       newParams.delete("sort");
                     } else {
                       newParams.set("sort", e.target.value);
                     }
-                    window.location.href = `/search?${newParams.toString()}`;
+
+                    navigate(`/search?${newParams.toString()}`, {
+                      replace: true,
+                    });
                   }}
-                  aria-label="Sort search results"
                 >
                   <option value="relevance">Relevance</option>
                   <option value="price_asc">Price: Low to High</option>
