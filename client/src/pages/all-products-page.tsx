@@ -55,11 +55,11 @@ const allCategories = [
 
 export default function AllProductsPage() {
   const params = useParams();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const [currentPage, setCurrentPage] = useState<number>(
     parseInt(params.page || "1")
   );
-  const [pageSize, setPageSize] = useState<number>(10);
+  const [pageSize, setPageSize] = useState<number>(20);
   const [totalPages, setTotalPages] = useState<number>(1);
 
   // Function to get product image URL
@@ -98,11 +98,11 @@ export default function AllProductsPage() {
   };
 
   // Get sellerId from URL query parameters if available
-  const [searchParams] = useState(
-    () => new URLSearchParams(window.location.search)
-  );
+  const searchParams = new URLSearchParams(location);
+
   const sellerId = searchParams.get("sellerId");
   const sellerName = searchParams.get("sellerName");
+  const sortParam = searchParams.get("sort");
 
   // Fetch a larger pool of products for better mixing
   const LARGE_POOL_SIZE = 500;
@@ -127,8 +127,11 @@ export default function AllProductsPage() {
 
   // Update URL when page changes
   useEffect(() => {
-    navigate(`/products/page/${currentPage}`);
-  }, [currentPage, navigate]);
+    const search = location.includes("?")
+      ? location.slice(location.indexOf("?"))
+      : "";
+    navigate(`/products/page/${currentPage}${search}`, { replace: true });
+  }, [currentPage]);
 
   // Update total pages when data is loaded
   useEffect(() => {
@@ -156,15 +159,40 @@ export default function AllProductsPage() {
                 }}
               >
                 <SelectTrigger className="w-full sm:w-[100px]">
-                  <SelectValue placeholder="10" />
+                  <SelectValue placeholder="20" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
                   <SelectItem value="50">50</SelectItem>
                   <SelectItem value="100">100</SelectItem>
                   <SelectItem value="500">500</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex items-center w-full sm:w-auto">
+              <span className="text-sm mr-2">Sort by:</span>
+              <select
+                className="text-sm border rounded px-2 py-1 w-full sm:w-auto"
+                value={sortParam || "relevance"}
+                onChange={(e) => {
+                  const newParams = new URLSearchParams(location);
+                  if (e.target.value === "relevance") {
+                    newParams.delete("sort");
+                  } else {
+                    newParams.set("sort", e.target.value);
+                  }
+                  navigate(
+                    `${newParams.toString()}`,
+                    { replace: true }
+                  );
+                }}
+                aria-label="Sort products"
+              >
+                <option value="relevance">Relevance</option>
+                <option value="price_asc">Price: Low to High</option>
+                <option value="price_desc">Price: High to Low</option>
+                <option value="newest">Newest</option>
+              </select>
             </div>
           </div>
         </div>
@@ -187,7 +215,35 @@ export default function AllProductsPage() {
             {/* True mixup: each row contains products from different categories, as much as possible */}
             <div className="space-y-8">
               {(() => {
-                const products = productsData.products;
+                const products = [...productsData.products];
+                // Apply optional sorting driven by URL `sort` param
+                if (
+                  sortParam &&
+                  Array.isArray(products) &&
+                  products.length > 0
+                ) {
+                  if (sortParam === "price_asc") {
+                    products.sort(
+                      (a: Product, b: Product) =>
+                        (a.price || 0) - (b.price || 0)
+                    );
+                  } else if (sortParam === "price_desc") {
+                    products.sort(
+                      (a: Product, b: Product) =>
+                        (b.price || 0) - (a.price || 0)
+                    );
+                  } else if (sortParam === "newest") {
+                    products.sort((a: Product, b: Product) => {
+                      const aTime = a.createdAt
+                        ? new Date(a.createdAt).getTime()
+                        : 0;
+                      const bTime = b.createdAt
+                        ? new Date(b.createdAt).getTime()
+                        : 0;
+                      return bTime - aTime;
+                    });
+                  }
+                }
                 // Group products by category (case-insensitive)
                 const categoryMap: Record<string, Product[]> = {};
                 const foundCategories: Set<string> = new Set();

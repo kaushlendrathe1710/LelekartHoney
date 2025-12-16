@@ -184,8 +184,6 @@ export default function ContactUsPage() {
                                 <br />
                                 SAS Nagar
                                 <br />
-                                Mohali
-                                <br />
                                 140601
                               </p>
                             }
