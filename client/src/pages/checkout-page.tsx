@@ -99,7 +99,9 @@ const checkoutSchema = z.object({
     .min(6, { message: "PIN code must be exactly 6 digits" })
     .max(6, { message: "PIN code must be exactly 6 digits" })
     .regex(/^[0-9]{6}$/, { message: "PIN code must contain only digits" }),
-  paymentMethod: z.enum(["cod", "razorpay"], {
+  paymentMethod: z.enum([
+    // "cod",
+    "razorpay"], {
     required_error: "Please select a payment method",
   }),
   notes: z.string().optional().default(""),
@@ -275,7 +277,7 @@ export default function CheckoutPage() {
       city: "",
       state: "",
       zipCode: "",
-      paymentMethod: "cod",
+      paymentMethod: "razorpay",
       notes: "",
     },
     // Set form to always be valid when using saved addresses to prevent validation issues
@@ -438,7 +440,7 @@ export default function CheckoutPage() {
               state: addressToUse.state,
               zipCode: addressToUse.pincode,
               email: emailValue,
-              paymentMethod: "cod",
+              paymentMethod: "razorpay",
               notes: "",
             },
             {
@@ -877,15 +879,15 @@ export default function CheckoutPage() {
     : 0;
 
   // COD handling fee (₹7) applies only when Cash on Delivery is selected
-  const codHandlingFee = form.watch("paymentMethod") === "cod" ? 7 : 0;
+  // const codHandlingFee = form.watch("paymentMethod") === "cod" ? 7 : 0;
 
   // The final total after discounts and any applicable COD handling fee
   const finalOrderTotal =
     subtotal +
     deliveryCharges -
     (useWalletCoins && walletDiscount > 0 ? walletDiscount : 0) -
-    (appliedCoupon ? couponDiscountAmount : 0) +
-    codHandlingFee;
+    (appliedCoupon ? couponDiscountAmount : 0) 
+    // + codHandlingFee;
 
   // Update wallet discount state only when checkbox is checked and wallet is eligible
   useEffect(() => {
@@ -1801,8 +1803,11 @@ export default function CheckoutPage() {
                     <h3 className="font-medium text-base mb-4">
                       Payment Method
                     </h3>
+                    <p className="text-sm text-gray-600">
+                      Online Payment (Razorpay)
+                    </p>
 
-                    <FormField
+                    {/* <FormField
                       control={form.control}
                       name="paymentMethod"
                       render={({ field }) => (
@@ -1834,7 +1839,7 @@ export default function CheckoutPage() {
                           <FormMessage />
                         </FormItem>
                       )}
-                    />
+                    /> */}
 
                     {form.watch("paymentMethod") === "razorpay" ? (
                       <div className="border-t pt-4 mt-4">
@@ -1907,7 +1912,8 @@ export default function CheckoutPage() {
                                   state: selectedAddress.state,
                                   zipCode: selectedAddress.pincode,
                                   paymentMethod:
-                                    form.getValues("paymentMethod") || "cod",
+                                    form.getValues("paymentMethod"),
+                                    // || "cod",
                                   notes: form.getValues("notes") || "",
                                 };
 
@@ -1962,8 +1968,8 @@ export default function CheckoutPage() {
                   {appliedCoupon
                     ? "Applied"
                     : couponLoading
-                      ? "Applying..."
-                      : "Apply"}
+                    ? "Applying..."
+                    : "Apply"}
                 </Button>
               </div>
               {couponError && (
@@ -2001,7 +2007,9 @@ export default function CheckoutPage() {
                     </div>
                     <div className="text-xs text-green-800/90">
                       {estimatedWindow
-                        ? `${formatTentativeDate(estimatedWindow.start)} - ${formatTentativeDate(estimatedWindow.end)}`
+                        ? `${formatTentativeDate(
+                            estimatedWindow.start
+                          )} - ${formatTentativeDate(estimatedWindow.end)}`
                         : "Enter a valid 6-digit PIN to see estimated delivery"}
                     </div>
                   </div>
@@ -2181,12 +2189,12 @@ export default function CheckoutPage() {
                 </div>
               )}
               {/* Show COD handling fee when COD is selected */}
-              {form.watch("paymentMethod") === "cod" && (
+              {/* {form.watch("paymentMethod") === "cod" && (
                 <div className="flex justify-between mb-2">
                   <span className="text-gray-600">Cash Handling Fee (COD)</span>
                   <span className="font-medium">+₹7.00</span>
                 </div>
-              )}
+              )} */}
               {/* Show original total with strikethrough and discounted total in green if any discount is applied */}
               {walletDiscount > 0 || couponDiscountAmount > 0 ? (
                 <div className="flex flex-col mb-6">
@@ -2219,13 +2227,14 @@ export default function CheckoutPage() {
                 <p className="text-sm text-gray-600">
                   {form.watch("paymentMethod") === "razorpay"
                     ? "Pay Online with Razorpay"
-                    : "Cash on Delivery (COD)"}
+                    : "Cash on Delivery (COD)"
+                    }
                 </p>
-                {form.watch("paymentMethod") === "cod" && (
+                {/* {form.watch("paymentMethod") === "cod" && (
                   <p className="text-xs text-orange-700 mt-2">
                     An additional ₹7 will be added for cash handling.
                   </p>
-                )}
+                )} */}
               </div>
             </div>
           </div>
