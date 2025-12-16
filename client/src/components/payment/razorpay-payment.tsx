@@ -427,7 +427,7 @@ export default function RazorpayPayment({
         </div>
 
         {/* Development mode info message */}
-        <div className="mt-3 p-3 border border-blue-200 bg-blue-50 rounded-md">
+        {/* <div className="mt-3 p-3 border border-blue-200 bg-blue-50 rounded-md">
           <p className="text-sm text-blue-800 font-medium">
             Development Environment
           </p>
@@ -436,7 +436,7 @@ export default function RazorpayPayment({
             register your domain in the Razorpay dashboard under Settings &gt;
             Websites &amp; Apps to avoid domain verification errors.
           </p>
-        </div>
+        </div> */}
       </CardContent>
       <CardFooter>
         <Button
