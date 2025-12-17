@@ -19,9 +19,14 @@ import { uploadFile, getPresignedDownloadUrl, deleteFile } from "./helpers/s3";
 import * as XLSX from "xlsx";
 import templateService from "./services/template-service";
 import * as pdfGenerator from "./services/pdf-generator"; // Import PDF generator service
-import { getShippingLabelTemplate } from "./services/pdf-generator"; // Import shipping label template
+import {
+  getShippingLabelTemplate,
+  generateInvoiceHtml as generateGstInvoiceHtml,
+} from "./services/pdf-generator"; // Import shipping label template and GST invoice generator
 import htmlPdf from "html-pdf-node"; // Import html-pdf-node for direct PDF generation
 import handlebars from "handlebars"; // For template rendering
+import * as invoiceService from "./services/invoice-service"; // Import GST invoice service
+import { getGstType } from "./services/pincode-service"; // Import GST type determination
 
 // Half A4 PDF generation options
 const HALF_A4_PDF_OPTIONS = {
@@ -1073,33 +1078,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          // Fallback addresses if not found in settings
-          if (!pickupAddress) {
-            pickupAddress = {
-              businessName:
-                taxInformation?.businessName ||
-                seller.name ||
-                "Lele Kart Retail Private Limited",
-              line1: seller.address || "123 Commerce Street",
-              line2: "",
-              city: "Mumbai",
-              state: "Maharashtra",
-              pincode: "400001",
-              phone: seller.phone || "Phone not available",
-              gstin: taxInformation?.gstin || "GSTIN not available",
-            };
-          }
+          // Use static seller address instead of dynamic addresses
+          const STATIC_SELLER_ADDRESS = {
+            businessName: "Kaushal Ranjeet pvt. ltd.",
+            line1: "Building no 2072, Chandigarh Royale City",
+            line2: "Bollywood Gully",
+            city: "Banur",
+            state: "Punjab",
+            pincode: "140601",
+            country: "India",
+          };
 
-          if (!billingAddress) {
-            billingAddress = {
-              line1: seller.address || "123 Commerce Street",
-              line2: "",
-              city: "Mumbai",
-              state: "Maharashtra",
-              pincode: "400001",
-              phone: seller.phone || "Phone not available",
-            };
-          }
+          // Override pickup and billing addresses with static address
+          pickupAddress = {
+            businessName: STATIC_SELLER_ADDRESS.businessName,
+            line1: STATIC_SELLER_ADDRESS.line1,
+            line2: STATIC_SELLER_ADDRESS.line2,
+            city: STATIC_SELLER_ADDRESS.city,
+            state: STATIC_SELLER_ADDRESS.state,
+            pincode: STATIC_SELLER_ADDRESS.pincode,
+            phone: seller.phone || "Phone not available",
+            gstin: taxInformation?.gstin || "03AAICK9276F1ZC",
+          };
+
+          billingAddress = {
+            line1: STATIC_SELLER_ADDRESS.line1,
+            line2: STATIC_SELLER_ADDRESS.line2,
+            city: STATIC_SELLER_ADDRESS.city,
+            state: STATIC_SELLER_ADDRESS.state,
+            pincode: STATIC_SELLER_ADDRESS.pincode,
+            phone: seller.phone || "Phone not available",
+          };
 
           // Get product details for each order item
           const orderItemsWithProducts = await Promise.all(
@@ -1178,6 +1187,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           );
 
+          // Get buyer's shipping address to determine GST type
+          const shippingDetails =
+            typeof order.shippingDetails === "string"
+              ? JSON.parse(order.shippingDetails)
+              : order.shippingDetails;
+
+          const buyerPincode =
+            shippingDetails?.zipCode || shippingDetails?.pincode || "000000";
+
+          // Determine GST type based on static seller address and buyer's pincode
+          const gstType = getGstType(
+            STATIC_SELLER_ADDRESS.pincode,
+            buyerPincode
+          );
+          const isSameState = gstType === "CGST+SGST";
+
+          console.log(
+            `Order ${orderId} GST Type: ${gstType} (Seller: ${STATIC_SELLER_ADDRESS.pincode}, Buyer: ${buyerPincode})`
+          );
+
           // Build the invoice data object for this seller
           const invoiceData = {
             order: {
@@ -1189,10 +1218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 order.status.charAt(0).toUpperCase() + order.status.slice(1),
               subtotal,
               items: orderItemsWithProducts,
-              shippingDetails:
-                typeof order.shippingDetails === "string"
-                  ? JSON.parse(order.shippingDetails)
-                  : order.shippingDetails,
+              shippingDetails: shippingDetails,
             },
             user,
             seller: {
@@ -1201,6 +1227,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               billingAddress,
               taxInformation,
             },
+            gstType, // "CGST+SGST" or "IGST"
+            isSameState, // true if seller and buyer in same state
             currentDate: new Date().toLocaleDateString("en-IN", {
               year: "numeric",
               month: "long",
@@ -1252,8 +1280,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
           });
 
-          // Generate HTML for this seller's invoice
-          const invoiceHtml = await generateInvoiceHtml(invoiceData);
+          // Generate HTML for this seller's invoice using GST-compliant invoice generator
+          const invoiceHtml = await generateGstInvoiceHtml(invoiceData);
           return {
             sellerId: parseInt(sellerId),
             sellerName: seller.name,
@@ -1588,14 +1616,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
         invoiceNumber,
         invoiceDate,
         distributor,
-        items,
-        subtotal,
-        totalGst,
-        grandTotal,
-        additionalNotes,
+        items, // Now contains only productId, productName, and quantity
       } = req.body;
 
       console.log("Generating custom invoice:", invoiceNumber);
+      console.log("Items received:", items);
+
+      // Fetch product details from database for each item
+      const itemsWithDetails = await Promise.all(
+        items.map(async (item: any) => {
+          const [product] = await db
+            .select()
+            .from(products)
+            .where(eq(products.id, item.productId))
+            .limit(1);
+
+          if (!product) {
+            throw new Error(`Product not found: ${item.productId}`);
+          }
+
+          // Calculate GST-inclusive pricing
+          const inclusivePrice = product.price;
+          const gstRate = product.gstRate || 0;
+          const deliveryCharges = product.deliveryCharges || 0;
+          const totalPrice = item.quantity * inclusivePrice;
+
+          // Extract taxable value and GST amount from inclusive price
+          const taxableValue =
+            gstRate > 0 ? totalPrice / (1 + gstRate / 100) : totalPrice;
+          const gstAmount = totalPrice - taxableValue;
+
+          return {
+            productId: product.id,
+            productName: product.name,
+            quantity: item.quantity,
+            price: inclusivePrice, // GST-inclusive price per unit
+            gstRate: gstRate,
+            mrp: product.mrp || inclusivePrice,
+            deliveryCharges: deliveryCharges,
+            taxableValue: taxableValue,
+            gstAmount: gstAmount,
+            total: totalPrice,
+          };
+        })
+      );
+
+      // Calculate totals
+      const totalTaxableValue = itemsWithDetails.reduce(
+        (sum, item) => sum + item.taxableValue,
+        0
+      );
+      const totalGst = itemsWithDetails.reduce(
+        (sum, item) => sum + item.gstAmount,
+        0
+      );
+      const totalDeliveryCharges = itemsWithDetails.reduce(
+        (sum, item) => sum + item.deliveryCharges,
+        0
+      );
+      const grandTotal =
+        itemsWithDetails.reduce((sum, item) => sum + item.total, 0) +
+        totalDeliveryCharges;
+
+      console.log("Calculated totals:", {
+        totalTaxableValue,
+        totalGst,
+        totalDeliveryCharges,
+        grandTotal,
+        itemsWithDetails,
+      });
+
+      if (!grandTotal || grandTotal <= 0) {
+        throw new Error("Invalid grand total calculated");
+      }
 
       // Get the distributor's user account to create the order
       const distributorRecord = await db
@@ -1645,6 +1738,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn("Failed to get seller settings:", err);
       }
 
+      // Static seller address as per invoice template
+      const STATIC_SELLER_ADDRESS = {
+        businessName: "Kaushal Ranjeet pvt. ltd.",
+        line1: "Building no 2072, Chandigarh Royale City",
+        line2: "Bollywood Gully",
+        city: "Banur",
+        state: "Punjab",
+        pincode: "140601",
+        country: "India",
+      };
+
+      // Determine GST type based on seller and distributor PIN codes
+      const gstType = getGstType(
+        STATIC_SELLER_ADDRESS.pincode,
+        distributor.pincode
+      );
+      const isSameState = gstType === "CGST+SGST";
+
+      console.log(
+        `GST Type: ${gstType} (Seller: ${STATIC_SELLER_ADDRESS.pincode}, Distributor: ${distributor.pincode})`
+      );
+
       // Build invoice data structure for distributor invoice
       const invoiceData = {
         invoiceNumber,
@@ -1667,20 +1782,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             zipCode: distributor.pincode,
             country: "India",
           },
-          items: items.map((item: any, index: number) => ({
+          items: itemsWithDetails.map((item: any, index: number) => ({
             id: index + 1,
             product: {
               name: item.productName,
               mrp: item.mrp || item.price,
               gstRate: item.gstRate,
-              deliveryCharges: 0,
+              deliveryCharges: item.deliveryCharges,
             },
             quantity: item.quantity,
-            price: item.price,
+            price: item.price, // This is GST-inclusive price
             gstRate: item.gstRate,
-            subtotal: item.subtotal,
-            gstAmount: item.gstAmount,
-            total: item.total,
+            deliveryCharges: item.deliveryCharges,
+            taxableValue: item.taxableValue, // Price excluding GST
+            gstAmount: item.gstAmount, // GST amount extracted from inclusive price
+            total: item.total, // Total is same as quantity * inclusive price
           })),
         },
         user: {
@@ -1697,43 +1813,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           address: `${distributor.address}, ${distributor.city}, ${distributor.state} - ${distributor.pincode}`,
         },
         seller: {
-          name: seller.name || seller.username,
-          businessName:
-            businessDetails?.businessName || seller.name || "Your Business",
+          name: STATIC_SELLER_ADDRESS.businessName,
+          businessName: STATIC_SELLER_ADDRESS.businessName,
           phone: seller.phone || "N/A",
           email: seller.email,
           gstNumber:
-            taxInformation?.gstNumber || businessDetails?.gstNumber || "N/A",
-          address: pickupAddress?.line1 || "Business Address",
-          pickupAddress: pickupAddress
-            ? {
-                businessName:
-                  businessDetails?.businessName ||
-                  seller.name ||
-                  "Your Business",
-                line1: pickupAddress.line1 || "",
-                line2: pickupAddress.line2 || "",
-                city: pickupAddress.city || "",
-                state: pickupAddress.state || "",
-                pincode: pickupAddress.pincode || "",
-                country: "India",
-              }
-            : null,
-          billingAddress: pickupAddress
-            ? {
-                line1: pickupAddress.line1 || "",
-                line2: pickupAddress.line2 || "",
-                city: pickupAddress.city || "",
-                state: pickupAddress.state || "",
-                pincode: pickupAddress.pincode || "",
-                country: "India",
-              }
-            : null,
+            taxInformation?.gstNumber ||
+            businessDetails?.gstNumber ||
+            "03AAICK9276F1ZC",
+          address: STATIC_SELLER_ADDRESS.line1,
+          pickupAddress: {
+            businessName: STATIC_SELLER_ADDRESS.businessName,
+            line1: STATIC_SELLER_ADDRESS.line1,
+            line2: STATIC_SELLER_ADDRESS.line2,
+            city: STATIC_SELLER_ADDRESS.city,
+            state: STATIC_SELLER_ADDRESS.state,
+            pincode: STATIC_SELLER_ADDRESS.pincode,
+            country: STATIC_SELLER_ADDRESS.country,
+          },
+          billingAddress: {
+            line1: STATIC_SELLER_ADDRESS.line1,
+            line2: STATIC_SELLER_ADDRESS.line2,
+            city: STATIC_SELLER_ADDRESS.city,
+            state: STATIC_SELLER_ADDRESS.state,
+            pincode: STATIC_SELLER_ADDRESS.pincode,
+            country: STATIC_SELLER_ADDRESS.country,
+          },
           taxInformation: {
-            businessName:
-              businessDetails?.businessName || seller.name || "Your Business",
+            businessName: STATIC_SELLER_ADDRESS.businessName,
             gstin:
-              taxInformation?.gstNumber || businessDetails?.gstNumber || "N/A",
+              taxInformation?.gstNumber ||
+              businessDetails?.gstNumber ||
+              "03AAICK9276F1ZC",
             panNumber: taxInformation?.panNumber || "N/A",
           },
         },
@@ -1744,38 +1855,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pincode: distributor.pincode,
           country: "India",
         },
-        sellerAddress: pickupAddress || {
-          address1: "Business Address",
-          city: "City",
-          state: "State",
-          pincode: "000000",
-          country: "India",
+        sellerAddress: {
+          address1: STATIC_SELLER_ADDRESS.line1,
+          city: STATIC_SELLER_ADDRESS.city,
+          state: STATIC_SELLER_ADDRESS.state,
+          pincode: STATIC_SELLER_ADDRESS.pincode,
+          country: STATIC_SELLER_ADDRESS.country,
         },
-        items: items.map((item: any, index: number) => ({
-          id: index + 1,
-          product: {
-            name: item.productName,
-          },
-          quantity: item.quantity,
-          price: item.price,
-          gstRate: item.gstRate,
-          subtotal: item.subtotal,
-          gstAmount: item.gstAmount,
-          total: item.total,
-        })),
-        subtotal,
-        totalGst,
+        totalTaxableValue, // Total taxable value (sum of all items excluding GST)
+        totalGst, // Total GST amount
+        deliveryCharges: totalDeliveryCharges, // Total delivery charges
         total: grandTotal,
         grandTotal,
-        additionalNotes,
-        deliveryCharges: 0,
-        walletDiscount: 0,
-        rewardDiscount: 0,
-        redeemDiscount: 0,
-        store: {
-          pickupAddress,
-          taxInformation,
-        },
+        gstType, // "CGST+SGST" or "IGST"
+        isSameState, // true if seller and buyer in same state
+        pickupAddress,
+        taxInformation,
         currentDate: new Date().toLocaleDateString("en-IN", {
           year: "numeric",
           month: "long",
@@ -1813,7 +1908,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .values({
           userId: distributorUserId,
           status: "confirmed",
-          total: grandTotal,
+          total: Math.round(grandTotal), // Convert to integer (paise/cents)
           date: new Date(invoiceDate),
           shippingDetails: JSON.stringify(shippingDetails),
           paymentMethod: "custom_invoice",
@@ -1822,11 +1917,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .returning();
 
       // Insert order items
-      const orderItemsData = items.map((item: any) => ({
+      const orderItemsData = itemsWithDetails.map((item: any) => ({
         orderId: newOrder.id,
         productId: item.productId,
         quantity: item.quantity,
-        price: item.price,
+        price: Math.round(item.price), // Convert to integer (paise/cents)
         sellerId: req.user.id, // The admin/seller generating the invoice
       }));
 
@@ -1843,18 +1938,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentBalance = lastLedgerEntry.length
         ? lastLedgerEntry[0].balanceAfter
         : 0;
-      const newBalance = currentBalance + grandTotal;
+      const newBalance = currentBalance + Math.round(grandTotal);
 
       // Add ledger entry for this order using storage method to update distributor totals
       await storage.addLedgerEntry({
         distributorId: distributor.id,
         entryType: "order",
-        amount: grandTotal,
+        amount: Math.round(grandTotal),
         orderId: newOrder.id,
-        description: `Invoice ${invoiceNumber} - ${items.length} item(s)`,
+        description: `Invoice ${invoiceNumber} - ${itemsWithDetails.length} item(s)`,
         balanceAfter: newBalance,
         createdBy: req.user.id,
-        notes: additionalNotes || null,
+        notes: null,
       });
 
       console.log(
@@ -1863,8 +1958,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }, ledger updated with balance: ₹${newBalance / 100}`
       );
 
-      // Generate HTML using the same template as order invoices
-      const invoiceHtml = await generateInvoiceHtml(invoiceData);
+      // Generate HTML using GST-compliant invoice template
+      const invoiceHtml = await generateGstInvoiceHtml(invoiceData);
 
       // Generate PDF
       const file = { content: invoiceHtml };
@@ -2317,7 +2412,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }),
         orderItems: orderItems.map((item) => ({
           ...item,
-          formattedPrice: `₹${item.price.toFixed(2)}`,
+          formattedPrice: `${item.price.toFixed(2)}`,
         })),
       };
 
@@ -15062,7 +15157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             <td>{{formatMoney (multiply (subtract this.product.mrp this.price) this.quantity)}}</td>
             <td>{{calculateTaxableValue this.price this.quantity this.product.gstRate}}</td>
             <td class="taxes-cell">{{{calculateTaxes this.price this.quantity this.product.gstRate ../order.shippingDetails.state ../seller.pickupAddress.state}}}</td>
-            <td>{{#if this.product.deliveryCharges}}{{#if (gt this.product.deliveryCharges 0)}}₹{{multiply this.product.deliveryCharges this.quantity}}{{else}}Free{{/if}}{{else}}Free{{/if}}</td>
+            <td>{{#if this.product.deliveryCharges}}{{#if (gt this.product.deliveryCharges 0)}}{{multiply this.product.deliveryCharges this.quantity}}{{else}}Free{{/if}}{{else}}Free{{/if}}</td>
             <td>{{formatMoney (add (multiply this.price this.quantity) (multiply this.product.deliveryCharges this.quantity))}}</td>
           </tr>
         {{/each}}

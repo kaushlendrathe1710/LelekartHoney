@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -21,7 +20,6 @@ import {
   Building2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 
 interface Product {
   id: number;
@@ -48,15 +46,11 @@ interface InvoiceItem {
   productId: number;
   productName: string;
   quantity: number;
-  price: number;
-  gstRate: number;
-  mrp: number;
 }
 
 interface CustomInvoiceFormData {
   distributorId: string;
   items: InvoiceItem[];
-  additionalNotes?: string;
 }
 
 export function CustomInvoiceForm() {
@@ -82,9 +76,6 @@ export function CustomInvoiceForm() {
           productId: 0,
           productName: "",
           quantity: 1,
-          price: 0,
-          gstRate: 18,
-          mrp: 0,
         },
       ],
     },
@@ -146,20 +137,7 @@ export function CustomInvoiceForm() {
     if (product) {
       setValue(`items.${index}.productId`, product.id);
       setValue(`items.${index}.productName`, product.name);
-      setValue(`items.${index}.price`, product.price);
-      setValue(`items.${index}.gstRate`, product.gstRate || 18);
-      setValue(`items.${index}.mrp`, product.mrp || product.price);
     }
-  };
-
-  const calculateItemTotal = (item: InvoiceItem) => {
-    const subtotal = item.quantity * item.price;
-    const gstAmount = (subtotal * item.gstRate) / 100;
-    return subtotal + gstAmount;
-  };
-
-  const calculateGrandTotal = () => {
-    return items.reduce((total, item) => total + calculateItemTotal(item), 0);
   };
 
   const onSubmit = async (data: CustomInvoiceFormData) => {
@@ -183,19 +161,7 @@ export function CustomInvoiceForm() {
       // Generate a unique invoice number
       const invoiceNumber = `INV-${Date.now()}`;
 
-      // Calculate totals for each item
-      const itemsWithTotals = data.items.map((item) => ({
-        productId: item.productId,
-        productName: item.productName,
-        quantity: item.quantity,
-        price: item.price,
-        gstRate: item.gstRate,
-        mrp: item.mrp,
-        subtotal: item.quantity * item.price,
-        gstAmount: (item.quantity * item.price * item.gstRate) / 100,
-        total: calculateItemTotal(item),
-      }));
-
+      // Send item data with productId and quantity - backend will fetch price and GST from product table
       const invoiceData = {
         invoiceNumber,
         invoiceDate: new Date().toISOString(),
@@ -211,18 +177,11 @@ export function CustomInvoiceForm() {
           state: distributor.state,
           pincode: distributor.pincode,
         },
-        items: itemsWithTotals,
-        subtotal: items.reduce(
-          (sum, item) => sum + item.quantity * item.price,
-          0
-        ),
-        totalGst: items.reduce(
-          (sum, item) =>
-            sum + (item.quantity * item.price * item.gstRate) / 100,
-          0
-        ),
-        grandTotal: calculateGrandTotal(),
-        additionalNotes: data.additionalNotes,
+        items: data.items.map((item) => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+        })),
       };
 
       // Send request to generate PDF
@@ -330,9 +289,6 @@ export function CustomInvoiceForm() {
                   productId: 0,
                   productName: "",
                   quantity: 1,
-                  price: 0,
-                  gstRate: 18,
-                  mrp: 0,
                 })
               }
               disabled={loadingProducts}
@@ -359,8 +315,8 @@ export function CustomInvoiceForm() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-2 lg:col-span-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2 md:col-span-2">
                   <Label htmlFor={`items.${index}.productId`}>Product *</Label>
                   <Select
                     value={items[index]?.productId?.toString() || ""}
@@ -390,14 +346,10 @@ export function CustomInvoiceForm() {
                   {errors.items?.[index]?.productId && (
                     <p className="text-sm text-red-500">Product is required</p>
                   )}
-                  {/* Hidden fields for productName and mrp */}
+                  {/* Hidden field for productName */}
                   <input
                     type="hidden"
                     {...register(`items.${index}.productName`)}
-                  />
-                  <input
-                    type="hidden"
-                    {...register(`items.${index}.mrp`, { valueAsNumber: true })}
                   />
                 </div>
 
@@ -420,131 +372,9 @@ export function CustomInvoiceForm() {
                     </p>
                   )}
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor={`items.${index}.price`}>Price (₹)</Label>
-                  <Input
-                    id={`items.${index}.price`}
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    {...register(`items.${index}.price`, {
-                      valueAsNumber: true,
-                    })}
-                    placeholder="0.00"
-                    readOnly
-                    className="bg-gray-50"
-                  />
-                  {errors.items?.[index]?.price && (
-                    <p className="text-sm text-red-500">
-                      {errors.items[index]?.price?.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor={`items.${index}.gstRate`}>GST Rate (%)</Label>
-                  <Input
-                    id={`items.${index}.gstRate`}
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    {...register(`items.${index}.gstRate`, {
-                      valueAsNumber: true,
-                    })}
-                    placeholder="18"
-                    readOnly
-                    className="bg-gray-50"
-                  />
-                  {errors.items?.[index]?.gstRate && (
-                    <p className="text-sm text-red-500">
-                      {errors.items[index]?.gstRate?.message}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-muted p-3 rounded-md">
-                <div className="flex justify-between text-sm">
-                  <span>Subtotal:</span>
-                  <span>
-                    ₹
-                    {(
-                      items[index]?.quantity * items[index]?.price || 0
-                    ).toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>GST ({items[index]?.gstRate || 0}%):</span>
-                  <span>
-                    ₹
-                    {(
-                      (items[index]?.quantity *
-                        items[index]?.price *
-                        items[index]?.gstRate) /
-                        100 || 0
-                    ).toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between font-semibold border-t mt-2 pt-2">
-                  <span>Total:</span>
-                  <span>
-                    ₹
-                    {calculateItemTotal(
-                      items[index] || { quantity: 0, price: 0, gstRate: 0 }
-                    ).toFixed(2)}
-                  </span>
-                </div>
               </div>
             </div>
           ))}
-
-          <div className="bg-primary/5 border-2 border-primary/20 rounded-lg p-4">
-            <div className="space-y-2">
-              <div className="flex justify-between text-lg">
-                <span className="font-medium">Subtotal:</span>
-                <span>
-                  ₹
-                  {items
-                    .reduce((sum, item) => sum + item.quantity * item.price, 0)
-                    .toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between text-lg">
-                <span className="font-medium">Total GST:</span>
-                <span>
-                  ₹
-                  {items
-                    .reduce(
-                      (sum, item) =>
-                        sum + (item.quantity * item.price * item.gstRate) / 100,
-                      0
-                    )
-                    .toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between text-xl font-bold border-t-2 pt-2">
-                <span>Grand Total:</span>
-                <span className="text-primary">
-                  ₹{calculateGrandTotal().toFixed(2)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Additional Notes (Optional)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            {...register("additionalNotes")}
-            placeholder="Any additional notes or terms & conditions..."
-            rows={4}
-          />
         </CardContent>
       </Card>
 
