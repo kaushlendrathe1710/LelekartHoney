@@ -1030,9 +1030,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get the user (buyer) details
-      const user = await storage.getUser(order.userId);
+
+      let user = await storage.getUser(order.userId);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
+      }
+      // Fetch distributor for this user if available
+      let distributor = null;
+      try {
+        distributor = await db
+          .select()
+          .from(distributors)
+          .where(eq(distributors.userId, user.id))
+          .limit(1);
+        if (distributor && distributor.length > 0) distributor = distributor[0];
+        else distributor = null;
+      } catch (err) {
+        distributor = null;
+      }
+      // If distributor.companyName is available, use it as buyer name
+      if (
+        distributor &&
+        distributor.companyName &&
+        distributor.companyName.trim() !== ""
+      ) {
+        user = { ...user, name: distributor.companyName };
+      }
+      // If distributor.gstNumber is available, add it to user
+      if (
+        distributor &&
+        distributor.gstNumber &&
+        distributor.gstNumber.trim() !== ""
+      ) {
+        user = { ...user, gstNumber: distributor.gstNumber };
+        // Also set buyer.gstNumber for the invoice template
+        // If invoiceData is built later, ensure buyer is set accordingly
       }
 
       // Group order items by seller
@@ -1208,6 +1240,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
 
           // Build the invoice data object for this seller
+          const buyer = {
+            name: user.name,
+            companyName:
+              distributor && distributor.companyName
+                ? distributor.companyName
+                : undefined,
+            gstNumber:
+              distributor && distributor.gstNumber
+                ? distributor.gstNumber
+                : undefined,
+            email: user.email,
+            phone: user.phone,
+            address:
+              shippingDetails && shippingDetails.address
+                ? `${shippingDetails.address}, ${shippingDetails.city}, ${shippingDetails.state} - ${shippingDetails.zipCode}`
+                : undefined,
+          };
           const invoiceData = {
             order: {
               ...order,
@@ -1221,6 +1270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               shippingDetails: shippingDetails,
             },
             user,
+            buyer,
             seller: {
               ...seller,
               pickupAddress,
@@ -1761,6 +1811,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Build invoice data structure for distributor invoice
+      const buyerName =
+        distributor.companyName && distributor.companyName.trim() !== ""
+          ? distributor.companyName
+          : distributor.name;
       const invoiceData = {
         invoiceNumber,
         invoiceDate: new Date(invoiceDate).toLocaleDateString("en-IN", {
@@ -1800,12 +1854,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })),
         },
         user: {
-          name: distributor.name,
+          name: buyerName,
           email: distributor.email,
           phone: distributor.phone,
         },
         buyer: {
-          name: distributor.name,
+          name: buyerName,
           companyName: distributor.companyName,
           email: distributor.email,
           phone: distributor.phone,
