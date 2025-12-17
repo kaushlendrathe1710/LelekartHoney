@@ -129,6 +129,7 @@
   "devDependencies": {
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",
     "@tailwindcss/typography": "^0.5.19",
+    "@types/express": "^5.0.6",
     "@types/node": "^20.17.57",
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",

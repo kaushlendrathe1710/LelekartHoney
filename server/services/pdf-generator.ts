@@ -10,6 +10,7 @@ import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import fs from "fs";
 import { JSDOM } from "jsdom";
 import htmlPdf from "html-pdf-node";
+import QRCode from "qrcode";
 
 // Template types - export for use in other modules
 export const TEMPLATES = {
@@ -302,24 +303,24 @@ function getInvoiceTemplate(): string {
               <td>{{this.product.name}}</td>
               <td>{{this.product.description}}</td>
               <td>{{this.quantity}}</td>
-              <td>₹{{this.price}}</td>
+              <td>{{this.price}}</td>
               <td>{{this.product.gstRate}}%</td>
-              <td>₹{{this.gstAmount}}</td>
-              <td>₹{{this.totalPrice}}</td>
+              <td>{{this.gstAmount}}</td>
+              <td>{{this.totalPrice}}</td>
             </tr>
             {{/each}}
           </tbody>
         </table>
         
         <div class="invoice-total">
-          <div class="invoice-total-row">Subtotal: ₹{{order.subtotal}}</div>
-          <div class="invoice-total-row">Shipping: ₹{{order.shippingFee}}</div>
-          <div class="invoice-total-row">GST: ₹{{order.taxAmount}}</div>
-          <div class="invoice-total-row">Discount: -₹{{order.discount}}</div>
-          <div class="invoice-total-row"><strong>Total: ₹{{order.total}}</strong></div>
+          <div class="invoice-total-row">Subtotal: {{order.subtotal}}</div>
+          <div class="invoice-total-row">Shipping: {{order.shippingFee}}</div>
+          <div class="invoice-total-row">GST: {{order.taxAmount}}</div>
+          <div class="invoice-total-row">Discount: -{{order.discount}}</div>
+          <div class="invoice-total-row"><strong>Total: {{order.total}}</strong></div>
           {{#if order.wallet_discount}}
-          <div class="invoice-total-row">Paid with Wallet: -₹{{order.wallet_discount}}</div>
-          <div class="invoice-total-row"><strong>Balance Paid: ₹{{order.amountPaid}}</strong></div>
+          <div class="invoice-total-row">Paid with Wallet: -{{order.wallet_discount}}</div>
+          <div class="invoice-total-row"><strong>Balance Paid: {{order.amountPaid}}</strong></div>
           {{/if}}
         </div>
         
@@ -885,7 +886,7 @@ function getPackingSlipTemplate(): string {
                 <td>{{this.product.name}}</td>
                 <td>{{this.product.sku}}</td>
                 <td>{{this.quantity}}</td>
-                <td>₹{{this.price}}</td>
+                <td>{{this.price}}</td>
               </tr>
               {{/each}}
             </tbody>
@@ -901,283 +902,945 @@ function getPackingSlipTemplate(): string {
 }
 
 /**
- * Get the tax invoice template
+ * Generate invoice HTML with GST calculations
+ * This function mirrors the generateInvoiceHtml from routes.ts (lines 14351-15203)
  */
-/**
- * Get the tax invoice template from the filesystem or fallback to default
- */
-function getTaxInvoiceTemplate(): string {
+export async function generateInvoiceHtml(data: any): Promise<string> {
   try {
-    // First try to load the template from the filesystem
-    const template = fs.readFileSync(
-      "flipkart_style_invoice_template.html",
-      "utf8"
-    );
-    console.log("Using Flipkart-style tax invoice template from filesystem");
-    return template;
-  } catch (error) {
-    // If file read fails, return the default template
-    console.warn(
-      "Flipkart-style template not found in filesystem, using default template"
+    // Register Handlebars helpers
+    handlebars.registerHelper("formatMoney", function (value: number) {
+      return value.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+    });
+
+    // Helper function to convert number to Indian Rupee words
+    handlebars.registerHelper("amountInWords", function (amount: number) {
+      const ones = [
+        "",
+        "One",
+        "Two",
+        "Three",
+        "Four",
+        "Five",
+        "Six",
+        "Seven",
+        "Eight",
+        "Nine",
+      ];
+      const tens = [
+        "",
+        "",
+        "Twenty",
+        "Thirty",
+        "Forty",
+        "Fifty",
+        "Sixty",
+        "Seventy",
+        "Eighty",
+        "Ninety",
+      ];
+      const teens = [
+        "Ten",
+        "Eleven",
+        "Twelve",
+        "Thirteen",
+        "Fourteen",
+        "Fifteen",
+        "Sixteen",
+        "Seventeen",
+        "Eighteen",
+        "Nineteen",
+      ];
+
+      function convertLessThanThousand(n: number): string {
+        if (n === 0) return "";
+
+        let words = "";
+
+        // Handle hundreds
+        if (n >= 100) {
+          words += ones[Math.floor(n / 100)] + " Hundred ";
+          n %= 100;
+        }
+
+        // Handle tens and ones
+        if (n > 0) {
+          if (n < 10) {
+            words += ones[n];
+          } else if (n < 20) {
+            words += teens[n - 10];
+          } else {
+            words += tens[Math.floor(n / 10)];
+            if (n % 10 > 0) {
+              words += " " + ones[n % 10];
+            }
+          }
+        }
+
+        return words.trim();
+      }
+
+      if (amount === 0) return "Zero Rupees";
+
+      let rupees = Math.floor(amount);
+      const paise = Math.round((amount - rupees) * 100);
+
+      let words = "";
+
+      // Handle crores
+      if (rupees >= 10000000) {
+        const crore = Math.floor(rupees / 10000000);
+        words += convertLessThanThousand(crore) + " Crore ";
+        rupees %= 10000000;
+      }
+
+      // Handle lakhs
+      if (rupees >= 100000) {
+        const lakh = Math.floor(rupees / 100000);
+        words += convertLessThanThousand(lakh) + " Lakh ";
+        rupees %= 100000;
+      }
+
+      // Handle thousands
+      if (rupees >= 1000) {
+        const thousand = Math.floor(rupees / 1000);
+        words += convertLessThanThousand(thousand) + " Thousand ";
+        rupees %= 1000;
+      }
+
+      // Handle remaining amount
+      if (rupees > 0) {
+        words += convertLessThanThousand(rupees);
+      }
+
+      // Add "Rupees" if there's any amount
+      if (words) {
+        words += " Rupees";
+      }
+
+      // Add paise if any
+      if (paise > 0) {
+        words += " and " + convertLessThanThousand(paise) + " Paise";
+      }
+
+      return words.trim();
+    });
+
+    handlebars.registerHelper(
+      "calculateGST",
+      function (price: number, quantity: number, gstRate: number) {
+        const totalPrice = price * quantity;
+        // GST is already included in the price, so we need to extract it
+        const basePrice =
+          gstRate > 0 ? (totalPrice * 100) / (100 + gstRate) : totalPrice;
+        const gstAmount = totalPrice - basePrice;
+        return gstAmount.toFixed(2);
+      }
     );
 
-    return `<!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Tax Invoice</title>
-        <style>
-          @page {
-            size: A4;
-            margin: 3mm;
+    handlebars.registerHelper(
+      "calculateTaxableValue",
+      function (price: number, quantity: number, gstRate: number) {
+        const totalPrice = price * quantity;
+        const taxableValue = totalPrice / (1 + gstRate / 100);
+        return taxableValue.toFixed(2);
+      }
+    );
+
+    // Calculate taxable value from delivery charges (GST-inclusive)
+    handlebars.registerHelper(
+      "calculateDeliveryTaxable",
+      function (deliveryCharges: number, quantity: number, gstRate: number) {
+        if (!deliveryCharges || deliveryCharges === 0) return "Free";
+        const totalDelivery = deliveryCharges * quantity;
+        const taxableValue =
+          gstRate > 0 ? totalDelivery / (1 + gstRate / 100) : totalDelivery;
+        return taxableValue.toFixed(2);
+      }
+    );
+
+    // Combined tax calculation for product + delivery charges
+    handlebars.registerHelper(
+      "calculateTaxesWithDelivery",
+      function (
+        price: number,
+        quantity: number,
+        deliveryCharges: number,
+        gstRate: number,
+        isSameState: boolean
+      ) {
+        // Calculate product tax
+        const totalPrice = price * quantity;
+        const productTaxableValue =
+          gstRate > 0 ? totalPrice / (1 + gstRate / 100) : totalPrice;
+        const productTax = totalPrice - productTaxableValue;
+
+        // Calculate delivery tax
+        const totalDelivery = (deliveryCharges || 0) * quantity;
+        const deliveryTaxableValue =
+          gstRate > 0 ? totalDelivery / (1 + gstRate / 100) : totalDelivery;
+        const deliveryTax = totalDelivery - deliveryTaxableValue;
+
+        // Total tax
+        const totalTax = productTax + deliveryTax;
+
+        // Build explicit breakdown
+        let breakdown = "";
+
+        // Split into CGST+SGST or show as IGST based on state
+        if (isSameState) {
+          // Same state: CGST + SGST
+          const halfRate = gstRate / 2;
+          const productCGST = productTax / 2;
+          const productSGST = productTax / 2;
+          const deliveryCGST = deliveryTax / 2;
+          const deliverySGST = deliveryTax / 2;
+          const totalCGST = productCGST + deliveryCGST;
+          const totalSGST = productSGST + deliverySGST;
+
+          breakdown = `Product: CGST ${halfRate}% = ${productCGST.toFixed(
+            2
+          )}, SGST ${halfRate}% = ${productSGST.toFixed(2)}`;
+          if (deliveryTax > 0) {
+            breakdown += `<br>Delivery: CGST ${halfRate}% = ${deliveryCGST.toFixed(
+              2
+            )}, SGST ${halfRate}% = ${deliverySGST.toFixed(2)}`;
           }
-          
-          body {
-            font-family: Arial, sans-serif;
-            font-size: 9px;
-            color: #333;
-            margin: 0;
-            padding: 5px;
+          breakdown += `<br><strong>Total: CGST = ${totalCGST.toFixed(
+            2
+          )}, SGST = ${totalSGST.toFixed(2)}</strong>`;
+        } else {
+          // Different state: IGST
+          breakdown = `Product: IGST ${gstRate}% = ${productTax.toFixed(2)}`;
+          if (deliveryTax > 0) {
+            breakdown += `<br>Delivery: IGST ${gstRate}% = ${deliveryTax.toFixed(
+              2
+            )}`;
           }
-                     .invoice-container {
-             width: 148.5mm;
-             min-height: 210mm;
-             margin: 0 auto;
-             border: 1px solid #ccc;
-             overflow: visible;
-             position: relative;
-           }
-          .header-logo {
-            padding: 5px;
-            border-bottom: 1px solid #ccc;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-          }
-          .logo {
-            font-size: 16px;
-            font-weight: bold;
-            color: #2874f0;
-          }
-          .header-title {
-            background-color: #f0f0f0;
-            text-align: center;
-            padding: 4px;
-            font-weight: bold;
-            font-size: 12px;
-            border-bottom: 1px solid #ccc;
-          }
-                     .info-section {
-             display: flex;
-             width: 100%;
-             border-bottom: 1px solid #ccc;
-             margin-bottom: 15px;
-           }
-           .left-column, .right-column {
-             width: 50%;
-             padding: 10px;
-           }
-          .right-column {
-            border-left: 1px solid #ccc;
-          }
-          .info-label {
-            font-weight: bold;
-            margin-bottom: 5px;
-          }
-          .address-block {
-            margin-left: 0;
-            margin-top: 5px;
-            font-size: 11px;
-            line-height: 1.4;
-          }
-                     table {
-             width: 100%;
-             border-collapse: collapse;
-             margin-top: 10px;
-           }
-          table, th, td {
-            border: 1px solid #ccc;
-          }
-                     th {
-             background-color: #f5f5f5;
-             text-align: center;
-             padding: 5px 4px;
-             font-weight: bold;
-             font-size: 9px;
-           }
-           td {
-             padding: 5px 4px;
-             text-align: center;
-             font-size: 9px;
-           }
-          .align-left {
-            text-align: left;
-          }
-          .align-right {
-            text-align: right;
-          }
-          .signature-section {
-            margin-top: 30px;
-            padding: 10px;
-            font-size: 11px;
-            text-align: right;
-            border-top: 1px solid #ccc;
-          }
-          .taxes-column {
-            max-width: 300px;
-          }
-          .totals-section {
-            display: flex;
-            justify-content: flex-end;
-            padding: 5px;
-            font-size: 8px;
-            border-top: 1px solid #ccc;
-          }
-          .totals-table {
-            width: 200px;
-            border: none;
-          }
-          .totals-table td {
-            border: none;
-            padding: 2px 3px;
-          }
-          .totals-table .total-label {
-            text-align: right;
-            font-weight: normal;
-          }
-          .totals-table .total-value {
-            text-align: right;
-            width: 100px;
-          }
-          .totals-table .grand-total {
-            font-weight: bold;
-            border-top: 1px solid #ccc;
-          }
-          .invoice-footer {
-            padding: 5px;
-            font-size: 8px;
-            text-align: center;
-            color: #666;
-            border-top: 1px solid #ccc;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="invoice-container">
-          <!-- Header with Logo -->
-          <div class="header-logo">
-            <div class="logo">LeLeKart</div>
-            <div style="text-align: right; font-size: 11px;">
-              <div><strong>Order #:</strong> {{order.orderNumber}}</div>
-              <div><strong>Order Date:</strong> {{order.orderDate}}</div>
-            </div>
-          </div>
-          
-          <!-- Invoice Header -->
-          <div class="header-title">TAX INVOICE</div>
-          
-          <!-- Invoice Info Section -->
-          <div class="info-section">
-            <div class="left-column">
-              <div class="info-label">SOLD BY:</div>
-              <div class="address-block">
-                {{order.sellerBusinessName}}<br>
-                {{order.sellerAddress}}<br>
-                GSTIN: {{order.sellerGstin}}
-              </div>
-              
-              <div class="info-label" style="margin-top: 15px;">BILLING ADDRESS:</div>
-              <div class="address-block">
-                {{order.billingName}}<br>
-                {{order.billingAddress}}
-              </div>
-            </div>
-            <div class="right-column">
-              <div class="info-label">INVOICE DETAILS:</div>
-              <div class="address-block">
-                <div><strong>Invoice Number:</strong> {{order.invoiceNumber}}</div>
-                <div><strong>Invoice Date:</strong> {{order.invoiceDate}}</div>
-                <div><strong>Place of Supply:</strong> {{order.state}}</div>
-              </div>
-              
-              <div class="info-label" style="margin-top: 15px;">SHIPPING ADDRESS:</div>
-              <div class="address-block">
-                {{order.shippingName}}<br>
-                {{order.shippingAddress}}
-              </div>
-            </div>
-          </div>
-          
-          <!-- Invoice Table -->
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 5%;">S.No</th>
-                <th style="width: 35%;">Description</th>
-                <th style="width: 8%;">HSN</th>
-                <th style="width: 5%;">Qty</th>
-                <th style="width: 8%;">Gross Amount</th>
-                <th style="width: 8%;">Discount</th>
-                <th style="width: 8%;">Taxable Value</th>
-                <th style="width: 15%;">Tax Rate & Amount</th>
-                <th style="width: 8%;">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {{#each order.items}}
-              <tr>
-                <td>{{this.srNo}}</td>
-                <td class="align-left">{{this.description}}</td>
-                <td>{{this.hsn}}</td>
-                <td>{{this.quantity}}</td>
-                <td class="align-right">₹{{this.mrp}}</td>
-                <td class="align-right">₹{{this.discount}}</td>
-                <td class="align-right">₹{{this.taxableValue}}</td>
-                <td class="align-left">
-                  {{#each this.taxComponents}}
-                  {{this.taxName}} @ {{this.taxRate}}%: ₹{{this.taxAmount}}<br>
-                  {{/each}}
-                </td>
-                <td class="align-right">₹{{this.total}}</td>
-              </tr>
-              {{/each}}
-            </tbody>
-          </table>
-          
-          <!-- Totals Section -->
-          <div class="totals-section">
-            <table class="totals-table">
-              <tr>
-                <td class="total-label">Total Gross Amount:</td>
-                <td class="total-value">₹{{order.totalGrossAmount}}</td>
-              </tr>
-              <tr>
-                <td class="total-label">Total Discount:</td>
-                <td class="total-value">₹{{order.totalDiscount}}</td>
-              </tr>
-              <tr>
-                <td class="total-label">Total Tax Value:</td>
-                <td class="total-value">₹{{order.totalTaxAmount}}</td>
-              </tr>
-              <tr class="grand-total">
-                <td class="total-label">Grand Total:</td>
-                <td class="total-value">₹{{order.grandTotal}}</td>
-              </tr>
-            </table>
-          </div>
-          
-          <!-- Signature Section -->
-          <div class="signature-section">
-            <div style="margin-bottom: 40px;">For {{order.sellerBusinessName}}</div>
-            <div class="info-label">Authorized Signatory</div>
-          </div>
-          
-          <!-- Footer -->
-          <div class="invoice-footer">
-            This is a computer-generated invoice and does not require a physical signature.
+          breakdown += `<br><strong>Total: IGST = ${totalTax.toFixed(
+            2
+          )}</strong>`;
+        }
+
+        return breakdown;
+      }
+    );
+
+    handlebars.registerHelper(
+      "calculateTaxes",
+      function (
+        price: number,
+        quantity: number,
+        gstRate: number,
+        buyerState: any,
+        sellerState: string
+      ) {
+        console.log("Buyer state received:", buyerState); // Debug log
+        console.log("Seller state received:", sellerState); // Debug log
+        const totalPrice = price * quantity;
+        const basePrice =
+          gstRate > 0 ? totalPrice / (1 + gstRate / 100) : totalPrice;
+        const taxAmount = totalPrice - basePrice;
+
+        // Helper function to normalize state names
+        const normalizeState = (state: string): string => {
+          if (!state) return "";
+
+          // Convert to lowercase and remove special characters
+          const normalized = state
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z]/g, "");
+
+          // Map of common state abbreviations to full names
+          const stateMap: { [key: string]: string } = {
+            hp: "himachalpradesh",
+            mp: "madhyapradesh",
+            up: "uttarpradesh",
+            ap: "andhrapradesh",
+            tn: "tamilnadu",
+            ka: "karnataka",
+            mh: "maharashtra",
+            gj: "gujarat",
+            rj: "rajasthan",
+            wb: "westbengal",
+            pb: "punjab",
+            hr: "haryana",
+            kl: "kerala",
+            or: "odisha",
+            br: "bihar",
+            jh: "jharkhand",
+            ct: "chhattisgarh",
+            ga: "goa",
+            mn: "manipur",
+            ml: "meghalaya",
+            tr: "tripura",
+            ar: "arunachalpradesh",
+            nl: "nagaland",
+            mz: "mizoram",
+            sk: "sikkim",
+            dl: "delhi",
+            ch: "chandigarh",
+            py: "pondicherry",
+            an: "andamanandnicobar",
+            dn: "dadraandnagarhaveli",
+            dd: "damananddiu",
+            ld: "lakshadweep",
+            jk: "jammukashmir",
+            la: "ladakh",
+            ut: "uttarakhand",
+            ts: "telangana",
+          };
+
+          // Check if the normalized state is an abbreviation
+          return stateMap[normalized] || normalized;
+        };
+
+        // Normalize both buyer and seller states
+        const normalizedBuyerState = normalizeState(String(buyerState || ""));
+        const normalizedSellerState = normalizeState(sellerState || "");
+
+        // If buyer and seller are from the same state, split GST into CGST and SGST
+        if (
+          normalizedBuyerState &&
+          normalizedSellerState &&
+          normalizedBuyerState === normalizedSellerState
+        ) {
+          const halfAmount = taxAmount / 2;
+          return `SGST @ ${gstRate / 2}% i.e. ${halfAmount.toFixed(
+            2
+          )}<br>CGST @ ${gstRate / 2}% i.e. ${halfAmount.toFixed(2)}`;
+        } else {
+          // If different states or state info not available, show as IGST
+          return `IGST @ ${gstRate}% i.e. ${taxAmount.toFixed(2)}`;
+        }
+      }
+    );
+
+    // Function to convert image URL to base64
+    const getBase64FromUrl = async (url: string): Promise<string> => {
+      try {
+        const response = await fetch(url);
+        const buffer = await response.arrayBuffer();
+        const base64 = Buffer.from(buffer).toString("base64");
+        const mimeType = response.headers.get("content-type") || "image/png";
+        return `data:${mimeType};base64,${base64}`;
+      } catch (error) {
+        console.error("Error converting image to base64:", error);
+        return ""; // Return empty string if conversion fails
+      }
+    };
+
+    // Convert logo and signature images to base64
+    const logoUrl =
+      "https://chunumunu.s3.ap-northeast-1.amazonaws.com/brand/Logo/krpl+final+logo.png";
+
+    const signatureUrl =
+      data.seller?.pickupAddress?.authorizationSignature ||
+      "https://drive.google.com/uc?export=view&id=1NC3MTl6qklBjamL3bhjRMdem6rQ0mB9F";
+
+    const [logoBase64, signatureBase64] = await Promise.all([
+      getBase64FromUrl(logoUrl),
+      getBase64FromUrl(signatureUrl),
+    ]);
+
+    // Generate QR code with invoice details
+    const qrData = `https://krpl.lelekart.in/orders/${data.order.id}`;
+
+    const qrCodeDataUrl = await QRCode.toDataURL(qrData, {
+      errorCorrectionLevel: "H",
+      margin: 1,
+      width: 75,
+    });
+
+    // Add QR code to the data
+    data.qrCodeDataUrl = qrCodeDataUrl;
+
+    // Register QR code helper
+    handlebars.registerHelper("qrCode", function () {
+      return new handlebars.SafeString(
+        `<img src="${qrCodeDataUrl}" alt="Invoice QR Code" style="width: 75px; height: 75px;">`
+      );
+    });
+
+    // Register 'gt' helper for greater-than comparisons
+    handlebars.registerHelper("gt", function (a, b) {
+      return a > b;
+    });
+
+    // Invoice template with fixed header alignment - Half A4 size
+    const invoiceTemplate = `
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Tax Invoice</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 3mm;
+    }
+
+    /* Half A4 container - width is half of A4, height is full A4 */
+    .half-a4-container {
+      width: 148.5mm;
+      /* Half of A4 width (297mm) */
+      height: 210mm;
+      /* A4 height */
+      margin: 0 auto;
+      position: relative;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 9px;
+      line-height: 1.2;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .container {
+      width: 148.5mm;
+      height: auto;
+      /* allow content-driven height to avoid extra bottom space */
+      margin: 0 auto;
+      border: 1px solid #000;
+      page-break-inside: avoid;
+      overflow: visible;
+      position: relative;
+    }
+
+    .invoice-header {
+      padding: 5px;
+      background-color: #ffffff;
+      margin-bottom: 0;
+      border-bottom: 1px solid #eee;
+      page-break-inside: avoid;
+      display: table;
+      width: 100%;
+      box-sizing: border-box;
+      height: 40px;
+    }
+
+    .header-left {
+      display: table-cell;
+      width: 35%;
+      vertical-align: top;
+      padding-top: 5px;
+    }
+
+    .header-right {
+      display: table-cell;
+      width: 65%;
+      vertical-align: top;
+      text-align: right;
+    }
+
+    .logo-crop {
+      height: 70px;
+      width: 160px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+    }
+
+    .invoice-logo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .invoice-title {
+      font-weight: bold;
+      font-size: 12px;
+      color: #2c3e50;
+      margin: 0 0 5px 0;
+      text-align: right;
+    }
+
+    .header-info-table {
+      border-collapse: collapse;
+      float: right;
+      clear: both;
+      margin-top: 0;
+    }
+
+    .header-info-table td {
+      padding: 1px 0;
+      font-size: 8px;
+      line-height: 1.1;
+    }
+
+    .header-info-table .label-col {
+      text-align: left;
+      padding-right: 8px;
+      white-space: nowrap;
+      min-width: 50px;
+    }
+
+    .header-info-table .value-col {
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .address-section {
+      overflow: visible;
+      font-size: 9px;
+      padding: 4px;
+      page-break-inside: avoid;
+      min-height: 60px;
+    }
+
+    .bill-to,
+    .ship-to {
+      width: 48%;
+      padding: 4px;
+      box-sizing: border-box;
+      min-height: 50px;
+      vertical-align: top;
+    }
+
+    .bill-to {
+      float: left;
+    }
+
+    .ship-to {
+      float: right;
+    }
+
+    .business-section {
+      overflow: visible;
+      font-size: 9px;
+      padding: 4px;
+      page-break-inside: avoid;
+      min-height: 50px;
+      margin-bottom: 15px;
+    }
+
+    .bill-from,
+    .ship-from {
+      width: 48%;
+      padding: 4px;
+      box-sizing: border-box;
+      min-height: 40px;
+      vertical-align: top;
+    }
+
+    .bill-from {
+      float: left;
+    }
+
+    .ship-from {
+      float: right;
+    }
+
+    table.items {
+      width: 100%;
+      border-collapse: collapse;
+      border-bottom: 1px solid #000;
+      font-size: 8px;
+      page-break-inside: avoid;
+      margin-top: 10px;
+    }
+
+    table.items th {
+      background-color: #f8f9fa;
+      border: 1px solid #000;
+      padding: 4px 3px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 8px;
+      color: #2c3e50;
+    }
+
+    table.items td {
+      border: 1px solid #000;
+      padding: 4px 3px;
+      text-align: center;
+      font-size: 8px;
+      vertical-align: top;
+    }
+
+    .description-cell {
+      text-align: left !important;
+      max-width: 90px;
+      word-wrap: break-word;
+      white-space: normal;
+    }
+
+    .amount-in-words {
+      margin: 0;
+      padding: 4px;
+      background-color: #ffffff;
+      font-family: 'Arial', sans-serif;
+      font-size: 9px;
+      line-height: 1.2;
+      color: #2c3e50;
+      page-break-inside: avoid;
+      min-height: 30px;
+    }
+
+    .signature-section {
+      background-color: #ffffff;
+      padding: 4px;
+      border-radius: 4px;
+      overflow: visible;
+      page-break-inside: avoid;
+      margin-bottom: 2px;
+      min-height: 40px;
+    }
+
+    .signature-content {
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .qr-section {
+      float: left;
+      width: 30%;
+      text-align: left;
+    }
+
+    .qr-section img,
+    .qr-section svg {
+      max-width: 35px;
+      max-height: 35px;
+    }
+
+    .signature-box {
+      float: right;
+      width: 30%;
+      text-align: center;
+      font-size: 8px;
+      color: #2c3e50;
+    }
+
+    .signature-box .bold {
+      font-size: 9px;
+      margin-bottom: 2px;
+      font-weight: 600;
+      color: #000000;
+    }
+
+    .signature-box img {
+      height: 20px;
+      margin: 3px auto;
+      display: block;
+      margin-left: auto;
+      object-fit: contain;
+    }
+
+    .bold {
+      font-weight: 600;
+      color: #2c3e50;
+    }
+
+    .taxes-cell {
+      font-size: 7px;
+      line-height: 1.2;
+    }
+
+    /* Clear floats */
+    .clearfix::after {
+      content: "";
+      display: table;
+      clear: both;
+    }
+
+    /* Print-specific styles */
+    @media print {
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .container {
+        page-break-inside: avoid;
+      }
+
+      table.items {
+        page-break-inside: avoid;
+      }
+
+      .signature-section {
+        page-break-inside: avoid;
+      }
+
+      .header-info-table {
+        page-break-inside: avoid;
+      }
+    }
+
+    /* Font loading fallbacks for consistent rendering */
+    @font-face {
+      font-family: 'Arial';
+      src: local('Arial'), local('Helvetica Neue'), local('Helvetica'), local('sans-serif');
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <!-- Fixed Header Section with proper alignment -->
+    <div class="invoice-header">
+      <div class="header-left">
+        <div class="logo-crop">
+          <img src="${logoBase64}" alt="KRPL Logo" class="invoice-logo">
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="invoice-title">Tax Invoice/Bill of Supply/Cash Memo</div>
+
+        <table class="header-info-table">
+          <tr>
+            <td class="label-col bold">Invoice Date:</td>
+            <td class="value-col">{{formatDate order.date " DD MMM YYYY,dddd"}}</td>
+          </tr>
+          <tr>
+            <td class="label-col bold">Invoice No:</td>
+            <td class="value-col">PPH-{{order.id}}</td>
+          </tr>
+          <tr>
+            <td class="label-col bold">Order No:</td>
+            <td class="value-col">{{order.orderNumber}}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="address-section clearfix">
+      <div class="bill-to">
+        <div class="bold">Billing Address</div>
+        <br>
+        {{#if order.shippingDetails}}
+          <div>{{user.name}}</div>
+          <div>{{order.shippingDetails.address}}</div>
+          {{#if order.shippingDetails.address2}}
+            <div>{{order.shippingDetails.address2}}</div>
+          {{/if}}
+          <div>{{order.shippingDetails.city}}, {{order.shippingDetails.state}} {{order.shippingDetails.zipCode}}</div>
+        {{else}}
+          <div>{{user.name}}</div>
+          <div>{{user.email}}</div>
+          <div>Address details not available</div>
+        {{/if}}
+        <div>GST Number: {{buyer.gstNumber}}</div>
+      </div>
+      <div class="ship-to">
+        <div class="bold">Shipping Address</div>
+        <br>
+        {{#if order.shippingDetails}}
+          <div>{{user.name}}</div>
+          <div>{{order.shippingDetails.address}}</div>
+          {{#if order.shippingDetails.address2}}
+            <div>{{order.shippingDetails.address2}}</div>
+          {{/if}}
+          <div>{{order.shippingDetails.city}}, {{order.shippingDetails.state}} {{order.shippingDetails.zipCode}}</div>
+        {{else}}
+          <div>{{user.name}}</div>
+          <div>{{user.email}}</div>
+          <div>Address details not available</div>
+        {{/if}}
+        <div>GST Number: {{buyer.gstNumber}}</div>
+      </div>
+    </div>
+
+    <div class="business-section clearfix">
+      <div class="bill-from">
+        <div class="bold">Bill From</div>
+        <br>
+        <div class="bold">Kaushal Ranjeet pvt. ltd.</div>
+        <div>Building no 2072, Chandigarh Royale City</div>
+        <div>Bollywood Gully</div>
+        <div>Banur SAS Nagar</div>
+        <div>140601</div>
+        <div>GST Number: 03AAICK9276F1ZC</div>
+      </div>
+      <div class="ship-from">
+        <div class="bold">Ship From</div>
+        <br>
+        <div class="bold">Kaushal Ranjeet pvt. ltd.</div>
+        <div>Building no 2072, Chandigarh Royale City</div>
+        <div>Bollywood Gully</div>
+        <div>Banur SAS Nagar</div>
+        <div>140601</div>
+        <div>GST Number: 03AAICK9276F1ZC</div>
+      </div>
+    </div>
+
+    <table class="items">
+      <thead>
+        <tr>
+          <th>Sr No</th>
+          <th>Description</th>
+          <th>Qty</th>
+          <th>MRP</th>
+          <th>Discount</th>
+          <th>Taxable Value</th>
+          <th>Delivery Charges</th>
+          <th>Taxes</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each order.items}}
+          <tr>
+            <td>{{add @index 1}}</td>
+            <td class="description-cell">{{this.product.name}}</td>
+            <td>{{this.quantity}}</td>
+            <td>{{formatMoney (multiply this.product.mrp this.quantity)}}</td>
+            <td>{{formatMoney (multiply (subtract this.product.mrp this.price) this.quantity)}}</td>
+            <td>{{calculateTaxableValue this.price this.quantity this.product.gstRate}}</td>
+            <td>{{calculateDeliveryTaxable this.product.deliveryCharges this.quantity this.product.gstRate}}</td>
+            <td class="taxes-cell">{{{calculateTaxesWithDelivery this.price this.quantity this.product.deliveryCharges this.product.gstRate ../isSameState}}}</td>
+            <td>{{formatMoney (add (multiply this.price this.quantity) (multiply this.product.deliveryCharges this.quantity))}}</td>
+          </tr>
+        {{/each}}
+      </tbody>
+    </table>
+
+    <div class="amount-in-words">
+      <span class="bold">Amount in words:</span>
+      <span style="font-style: italic; margin-left: 5px;">{{amountInWords total}} Only</span>
+    </div>
+
+    <div class="signature-section">
+      <div class="signature-content clearfix">
+        <div class="qr-section">
+          <div style="margin-bottom: 5px; font-size: 10px; color: #666;">Scan to verify invoice</div>
+          <div style="margin-top: 10px;">
+            {{{qrCode}}}
           </div>
         </div>
-      </body>
-    </html>`;
+        <div class="signature-box">
+          <img src="${signatureBase64}" alt="Authorized Signature" />
+          <div>KK</div>
+          <div class="bold">(Authorized Signatory)</div>
+        </div>
+      </div>
+
+      <!-- Declaration section inside container -->
+      <div style="padding: 12px; font-size: 10px; line-height: 1.4; color: #333; background-color: #f9f9f9; border-top: 1px solid #000; margin-top: 2px; max-width: 800px;">
+
+        <!-- Top Row -->
+        <div style="display: flex; justify-content: space-between; gap: 20px;">
+
+          <!-- (Left) -->
+          <div style="flex: 1; padding-right: 15px;">
+            <div style="font-weight: bold; font-size: 11px; color: #2c3e50;">
+              Contact Us
+            </div>
+            <div style="text-align: justify;">
+              For any questions, please call our customer care at +91 98774 54036. You can also use the Contact Us section in our App or visit krpl.lelekart.com/contact for assistance and support regarding your orders.
+            </div>
+          </div>
+
+          <!-- (Right) -->
+          <div style="flex: 1; padding-left: 15px;">
+            <div style="font-weight: bold; font-size: 11px; color: #2c3e50;">
+              Legal Jurisdiction
+            </div>
+            <div style="text-align: justify; margin-bottom: 6px;">
+              All disputes are subject to Mohali, SAS Nagar Punjab jurisdiction only.
+            </div>
+            <div style="font-weight: bold; font-size: 11px; color: #2c3e50;">
+              Returns & Claims
+            </div>
+            <div style="text-align: justify; margin-bottom: 6px;">
+              Goods once sold will not be taken back.
+            </div>
+          </div>
+        </div>
+        <!-- Middle Row -->
+        <div style="display: flex; justify-content: space-between; gap: 20px;">
+
+          <!-- (Left) -->
+          <div style="flex: 1; padding-right: 15px;">
+            <div style="font-weight: bold; font-size: 11px; color: #2c3e50;">
+              Delivery & Shipping
+            </div>
+            <div style="text-align: justify;">
+              Delivery timelines vary based on order volume. We are not liable for delays caused by transport/logistics partners.
+            </div>
+          </div>
+
+          <!-- (Right) -->
+          <div style="flex: 1; padding-left: 15px;">
+            <div style="font-weight: bold; font-size: 11px; color: #2c3e50;">
+              Regd. Office
+            </div>
+            <div style="text-align: justify;">
+              Building no 2072, Chandigarh Royale City, Bollywood Gully Banur, SAS Nagar, Punjab, India - 140601
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:center; align-items:center; font-weight:bold; margin-top:10px;">Thank you for doing business with us</div>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>
+`;
+
+    handlebars.registerHelper("calculateTotal", function (items) {
+      return items.reduce(
+        (sum: number, item: any) => sum + item.price * item.quantity,
+        0
+      );
+    });
+
+    // Additional helpers for math operations
+    handlebars.registerHelper("multiply", function (a: number, b: number) {
+      return a * b;
+    });
+
+    handlebars.registerHelper("add", function (a: number, b: number) {
+      return a + b;
+    });
+
+    handlebars.registerHelper("subtract", function (a: number, b: number) {
+      return a - b;
+    });
+
+    // Add formatDate helper if not already present
+    handlebars.registerHelper(
+      "formatDate",
+      function (date: string, format: string) {
+        // This is a placeholder - you'll need to implement proper date formatting
+        // or use a library like moment.js or date-fns
+        const d = new Date(date);
+        return d.toLocaleDateString("en-IN", {
+          weekday: "long",
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+        });
+      }
+    );
+
+    // Register 'gt' helper for greater-than comparisons
+    handlebars.registerHelper("gt", function (a, b) {
+      return a > b;
+    });
+
+    const template = handlebars.compile(invoiceTemplate);
+    return template(data);
+  } catch (error) {
+    console.error("Error generating invoice HTML:", error);
+    throw error;
   }
+}
+
+/**
+ * Get the tax invoice template - wrapper for backward compatibility
+ */
+function getTaxInvoiceTemplate(): string {
+  // This is now just a placeholder - actual generation happens in generateInvoiceHtml
+  return "";
 }
