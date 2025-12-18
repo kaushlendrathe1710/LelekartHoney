@@ -5,12 +5,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Plus,
   Trash2,
@@ -18,8 +32,12 @@ import {
   FileText,
   Loader2,
   Building2,
+  Eye,
+  Check,
+  ChevronsUpDown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface Product {
   id: number;
@@ -32,9 +50,10 @@ interface Product {
 interface Distributor {
   id: number;
   companyName: string;
-  contactEmail: string;
-  contactPhone: string;
-  contactPerson: string;
+  businessType: string;
+  userEmail: string;
+  userName: string;
+  userPhone: string;
   gstNumber?: string;
   address: string;
   city: string;
@@ -60,6 +79,14 @@ export function CustomInvoiceForm() {
   const [distributors, setDistributors] = useState<Distributor[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [loadingDistributors, setLoadingDistributors] = useState(true);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [invoiceDataForDownload, setInvoiceDataForDownload] =
+    useState<any>(null);
+  const [distributorOpen, setDistributorOpen] = useState(false);
+  const [productOpen, setProductOpen] = useState<{ [key: number]: boolean }>(
+    {}
+  );
 
   const {
     register,
@@ -137,7 +164,24 @@ export function CustomInvoiceForm() {
     if (product) {
       setValue(`items.${index}.productId`, product.id);
       setValue(`items.${index}.productName`, product.name);
+      setProductOpen({ ...productOpen, [index]: false });
     }
+  };
+
+  const getSelectedDistributorText = () => {
+    const distributorId = watch("distributorId");
+    if (!distributorId) return "Choose a distributor";
+    const dist = distributors.find((d) => d.id.toString() === distributorId);
+    return dist
+      ? `${dist.companyName} - ${dist.userName}`
+      : "Choose a distributor";
+  };
+
+  const getSelectedProductText = (index: number) => {
+    const productId = items[index]?.productId;
+    if (!productId) return "Select a product";
+    const product = products.find((p) => p.id === productId);
+    return product ? `${product.name} - ₹${product.price}` : "Select a product";
   };
 
   const onSubmit = async (data: CustomInvoiceFormData) => {
@@ -154,8 +198,8 @@ export function CustomInvoiceForm() {
       }
 
       toast({
-        title: "Generating Invoice",
-        description: "Your custom invoice is being generated...",
+        title: "Generating Preview",
+        description: "Your invoice preview is being generated...",
       });
 
       // Generate a unique invoice number
@@ -168,9 +212,9 @@ export function CustomInvoiceForm() {
         distributor: {
           id: distributor.id,
           companyName: distributor.companyName,
-          name: distributor.contactPerson,
-          email: distributor.contactEmail,
-          phone: distributor.contactPhone,
+          name: distributor.userName,
+          email: distributor.userEmail,
+          phone: distributor.userPhone,
           gstNumber: distributor.gstNumber || "N/A",
           address: distributor.address,
           city: distributor.city,
@@ -184,13 +228,61 @@ export function CustomInvoiceForm() {
         })),
       };
 
+      // Save invoice data for later download
+      setInvoiceDataForDownload(invoiceData);
+
+      // Send request to generate preview HTML
+      const response = await fetch("/api/invoices/preview-custom", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(invoiceData),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate preview");
+      }
+
+      // Get HTML preview
+      const html = await response.text();
+      setPreviewHtml(html);
+      setShowPreview(true);
+
+      toast({
+        title: "Preview Ready",
+        description: "Review your invoice before downloading.",
+      });
+    } catch (error) {
+      console.error("Error generating preview:", error);
+      toast({
+        title: "Preview Failed",
+        description: "Failed to generate the preview. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleDownloadInvoice = async () => {
+    if (!invoiceDataForDownload) return;
+
+    setIsGenerating(true);
+    try {
+      toast({
+        title: "Generating PDF",
+        description: "Your invoice is being downloaded...",
+      });
+
       // Send request to generate PDF
       const response = await fetch("/api/invoices/generate-custom", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(invoiceData),
+        body: JSON.stringify(invoiceDataForDownload),
         credentials: "include",
       });
 
@@ -203,12 +295,13 @@ export function CustomInvoiceForm() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${invoiceNumber}.pdf`;
+      a.download = `${invoiceDataForDownload.invoiceNumber}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
+      setShowPreview(false);
       toast({
         title: "Invoice Generated!",
         description: "Your custom invoice has been downloaded successfully.",
@@ -245,26 +338,52 @@ export function CustomInvoiceForm() {
                 </span>
               </div>
             ) : (
-              <Select
-                onValueChange={(value) => setValue("distributorId", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a distributor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {distributors.length === 0 ? (
-                    <SelectItem value="none" disabled>
-                      No distributors found
-                    </SelectItem>
-                  ) : (
-                    distributors.map((dist) => (
-                      <SelectItem key={dist.id} value={dist.id.toString()}>
-                        {dist.companyName} - {dist.contactPerson}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+              <Popover open={distributorOpen} onOpenChange={setDistributorOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={distributorOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {getSelectedDistributorText()}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search distributors..." />
+                    <CommandList>
+                      <CommandEmpty>
+                        {distributors.length === 0
+                          ? "No distributors found"
+                          : "No results found"}
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {distributors.map((dist) => (
+                          <CommandItem
+                            key={dist.id}
+                            value={`${dist.companyName} ${dist.userName}`}
+                            onSelect={() => {
+                              setValue("distributorId", dist.id.toString());
+                              setDistributorOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                watch("distributorId") === dist.id.toString()
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              }`}
+                            />
+                            {dist.companyName} - {dist.userName}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             )}
             {errors.distributorId && (
               <p className="text-sm text-red-500">Distributor is required</p>
@@ -318,31 +437,66 @@ export function CustomInvoiceForm() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor={`items.${index}.productId`}>Product *</Label>
-                  <Select
-                    value={items[index]?.productId?.toString() || ""}
-                    onValueChange={(value) => handleProductSelect(index, value)}
-                    disabled={loadingProducts}
-                  >
-                    <SelectTrigger>
-                      <SelectValue
-                        placeholder={
-                          loadingProducts
-                            ? "Loading products..."
-                            : "Select a product"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {products.map((product) => (
-                        <SelectItem
-                          key={product.id}
-                          value={product.id.toString()}
+                  {loadingProducts ? (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between font-normal"
+                      disabled
+                    >
+                      Loading products...
+                      <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                    </Button>
+                  ) : (
+                    <Popover
+                      open={productOpen[index] || false}
+                      onOpenChange={(open) =>
+                        setProductOpen({ ...productOpen, [index]: open })
+                      }
+                    >
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={productOpen[index] || false}
+                          className="w-full justify-between font-normal"
                         >
-                          {product.name} - ₹{product.price}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                          {getSelectedProductText(index)}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search products..." />
+                          <CommandList>
+                            <CommandEmpty>No products found</CommandEmpty>
+                            <CommandGroup>
+                              {products.map((product) => (
+                                <CommandItem
+                                  key={product.id}
+                                  value={`${product.name} ${product.price}`}
+                                  onSelect={() =>
+                                    handleProductSelect(
+                                      index,
+                                      product.id.toString()
+                                    )
+                                  }
+                                >
+                                  <Check
+                                    className={`mr-2 h-4 w-4 ${
+                                      items[index]?.productId === product.id
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    }`}
+                                  />
+                                  {product.name} - ₹{product.price}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  )}
                   {errors.items?.[index]?.productId && (
                     <p className="text-sm text-red-500">Product is required</p>
                   )}
@@ -391,12 +545,52 @@ export function CustomInvoiceForm() {
             </>
           ) : (
             <>
-              <Download className="h-4 w-4 mr-2" />
-              Generate Invoice
+              <Eye className="h-4 w-4 mr-2" />
+              Preview Invoice
             </>
           )}
         </Button>
       </div>
+
+      {/* Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Invoice Preview</DialogTitle>
+            <DialogDescription>
+              Review your invoice before downloading. Click "Download PDF" to
+              save the invoice.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="border rounded-lg overflow-auto max-h-[60vh]">
+            <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+          </div>
+
+          <DialogFooter className="flex justify-between gap-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowPreview(false)}
+              disabled={isGenerating}
+            >
+              Close
+            </Button>
+            <Button onClick={handleDownloadInvoice} disabled={isGenerating}>
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download PDF
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }
