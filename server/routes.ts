@@ -1653,6 +1653,234 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Preview custom invoice (returns HTML)
+  app.post("/api/invoices/preview-custom", async (req, res) => {
+    // Authentication check - only sellers and admins can generate custom invoices
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "seller" && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    try {
+      const { invoiceNumber, invoiceDate, distributor, items } = req.body;
+
+      console.log("Generating custom invoice preview:", invoiceNumber);
+
+      // Fetch product details from database for each item
+      const itemsWithDetails = await Promise.all(
+        items.map(async (item: any) => {
+          const [product] = await db
+            .select()
+            .from(products)
+            .where(eq(products.id, item.productId))
+            .limit(1);
+
+          if (!product) {
+            throw new Error(`Product not found: ${item.productId}`);
+          }
+
+          // Calculate GST-inclusive pricing
+          const inclusivePrice = product.price;
+          const gstRate = product.gstRate || 0;
+          const deliveryCharges = product.deliveryCharges || 0;
+          const totalPrice = item.quantity * inclusivePrice;
+
+          // Extract taxable value and GST amount from inclusive price
+          const taxableValue =
+            gstRate > 0 ? totalPrice / (1 + gstRate / 100) : totalPrice;
+          const gstAmount = totalPrice - taxableValue;
+
+          return {
+            productId: product.id,
+            productName: product.name,
+            quantity: item.quantity,
+            price: inclusivePrice,
+            gstRate: gstRate,
+            mrp: product.mrp || inclusivePrice,
+            deliveryCharges: deliveryCharges,
+            taxableValue: taxableValue,
+            gstAmount: gstAmount,
+            total: totalPrice,
+          };
+        })
+      );
+
+      // Calculate totals
+      const totalTaxableValue = itemsWithDetails.reduce(
+        (sum, item) => sum + item.taxableValue,
+        0
+      );
+      const totalGst = itemsWithDetails.reduce(
+        (sum, item) => sum + item.gstAmount,
+        0
+      );
+      const totalDeliveryCharges = itemsWithDetails.reduce(
+        (sum, item) => sum + item.deliveryCharges,
+        0
+      );
+      const grandTotal =
+        itemsWithDetails.reduce((sum, item) => sum + item.total, 0) +
+        totalDeliveryCharges;
+
+      // Get seller details
+      const seller = await storage.getUser(req.user.id);
+      if (!seller) {
+        return res.status(404).json({ error: "Seller not found" });
+      }
+
+      // Static seller address
+      const STATIC_SELLER_ADDRESS = {
+        businessName: "Kaushal Ranjeet pvt. ltd.",
+        line1: "Building no 2072, Chandigarh Royale City",
+        line2: "Bollywood Gully",
+        city: "Banur",
+        state: "Punjab",
+        pincode: "140601",
+        country: "India",
+      };
+
+      // Determine GST type
+      const gstType = getGstType(
+        STATIC_SELLER_ADDRESS.pincode,
+        distributor.pincode
+      );
+      const isSameState = gstType === "CGST+SGST";
+
+      const buyerName =
+        distributor.companyName && distributor.companyName.trim() !== ""
+          ? distributor.companyName
+          : distributor.name;
+      const invoiceData = {
+        invoiceNumber,
+        invoiceDate: new Date(invoiceDate).toLocaleDateString("en-IN", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+        order: {
+          id: invoiceNumber,
+          date: new Date(invoiceDate),
+          formattedDate: new Date(invoiceDate).toLocaleDateString("en-IN"),
+          paymentMethod: "Custom",
+          orderNumber: invoiceNumber,
+          shippingDetails: {
+            address: distributor.address,
+            address2: "",
+            city: distributor.city,
+            state: distributor.state,
+            zipCode: distributor.pincode,
+            country: "India",
+          },
+          items: itemsWithDetails.map((item: any, index: number) => ({
+            id: index + 1,
+            product: {
+              name: item.productName,
+              mrp: item.mrp || item.price,
+              gstRate: item.gstRate,
+              deliveryCharges: item.deliveryCharges,
+            },
+            quantity: item.quantity,
+            price: item.price,
+            gstRate: item.gstRate,
+            deliveryCharges: item.deliveryCharges,
+            taxableValue: item.taxableValue,
+            gstAmount: item.gstAmount,
+            total: item.total,
+          })),
+        },
+        user: {
+          name: buyerName,
+          email: distributor.email,
+          phone: distributor.phone,
+        },
+        buyer: {
+          name: buyerName,
+          companyName: distributor.companyName,
+          email: distributor.email,
+          phone: distributor.phone,
+          gstNumber: distributor.gstNumber,
+          address: `${distributor.address}, ${distributor.city}, ${distributor.state} - ${distributor.pincode}`,
+        },
+        seller: {
+          name: STATIC_SELLER_ADDRESS.businessName,
+          businessName: STATIC_SELLER_ADDRESS.businessName,
+          phone: seller.phone || "N/A",
+          email: seller.email,
+          gstNumber: "03AAICK9276F1ZC",
+          address: STATIC_SELLER_ADDRESS.line1,
+          pickupAddress: {
+            businessName: STATIC_SELLER_ADDRESS.businessName,
+            line1: STATIC_SELLER_ADDRESS.line1,
+            line2: STATIC_SELLER_ADDRESS.line2,
+            city: STATIC_SELLER_ADDRESS.city,
+            state: STATIC_SELLER_ADDRESS.state,
+            pincode: STATIC_SELLER_ADDRESS.pincode,
+            country: STATIC_SELLER_ADDRESS.country,
+          },
+          billingAddress: {
+            line1: STATIC_SELLER_ADDRESS.line1,
+            line2: STATIC_SELLER_ADDRESS.line2,
+            city: STATIC_SELLER_ADDRESS.city,
+            state: STATIC_SELLER_ADDRESS.state,
+            pincode: STATIC_SELLER_ADDRESS.pincode,
+            country: STATIC_SELLER_ADDRESS.country,
+          },
+          taxInformation: {
+            businessName: STATIC_SELLER_ADDRESS.businessName,
+            gstin: "03AAICK9276F1ZC",
+            panNumber: "N/A",
+          },
+        },
+        shippingAddress: {
+          address1: distributor.address,
+          city: distributor.city,
+          state: distributor.state,
+          pincode: distributor.pincode,
+          country: "India",
+        },
+        sellerAddress: {
+          address1: STATIC_SELLER_ADDRESS.line1,
+          city: STATIC_SELLER_ADDRESS.city,
+          state: STATIC_SELLER_ADDRESS.state,
+          pincode: STATIC_SELLER_ADDRESS.pincode,
+          country: STATIC_SELLER_ADDRESS.country,
+        },
+        totalTaxableValue,
+        totalGst,
+        deliveryCharges: totalDeliveryCharges,
+        total: grandTotal,
+        grandTotal,
+        gstType,
+        isSameState,
+        currentDate: new Date().toLocaleDateString("en-IN", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+      };
+
+      // Generate QR code
+      const qrData = `Invoice: ${invoiceNumber}\nAmount: ₹${grandTotal}\nDate: ${invoiceData.invoiceDate}`;
+      const qrCodeDataUrl = await QRCode.toDataURL(qrData, {
+        errorCorrectionLevel: "H",
+        margin: 1,
+        width: 75,
+      });
+
+      invoiceData.qrCodeDataUrl = qrCodeDataUrl;
+
+      // Generate HTML for preview
+      const invoiceHtml = await generateGstInvoiceHtml(invoiceData);
+
+      // Send HTML response
+      res.setHeader("Content-Type", "text/html");
+      res.send(invoiceHtml);
+    } catch (error) {
+      console.error("Error generating custom invoice preview:", error);
+      res.status(500).json({ error: "Failed to generate invoice preview" });
+    }
+  });
+
   // Generate custom invoice from form data
   app.post("/api/invoices/generate-custom", async (req, res) => {
     // Authentication check - only sellers and admins can generate custom invoices

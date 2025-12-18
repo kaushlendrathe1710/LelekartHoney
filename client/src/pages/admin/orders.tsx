@@ -136,7 +136,8 @@ type OrderWithItems = Order & {
 
 // Add a type guard for AdminShippingDetails
 interface AdminShippingDetails {
-  name: string;
+  name?: string;
+  companyName?: string;
   email: string;
   phone: string;
   address: string;
@@ -150,7 +151,7 @@ function isAdminShippingDetails(details: any): details is AdminShippingDetails {
   return (
     details &&
     typeof details === "object" &&
-    "name" in details &&
+    ("name" in details || "companyName" in details) &&
     "address" in details
   );
 }
@@ -930,9 +931,10 @@ export default function AdminOrders() {
                       <TableCell>
                         <div className="max-w-[200px] sm:max-w-[300px]">
                           <div className="font-medium truncate">
-                            {isAdminShippingDetails(order.shippingDetails)
-                              ? order.shippingDetails.name
-                              : "Unknown Customer"}
+                            {(isAdminShippingDetails(order.shippingDetails) &&
+                              order.shippingDetails.companyName) ||
+                              order.shippingDetails.name ||
+                              "Unknown Customer"}
                           </div>
                           <div className="text-sm text-muted-foreground truncate">
                             {isAdminShippingDetails(order.shippingDetails)
@@ -1152,7 +1154,8 @@ export default function AdminOrders() {
                       <div>
                         <p className="text-sm text-gray-500">Name</p>
                         <p className="font-medium">
-                          {viewOrder.shippingDetails.name}
+                          {viewOrder.shippingDetails.companyName ||
+                            viewOrder.shippingDetails.name}
                         </p>
                       </div>
                       <div>
