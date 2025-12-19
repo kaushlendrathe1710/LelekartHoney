@@ -45,13 +45,6 @@ const editDistributorSchema = z.object({
   city: z.string().min(2, "City is required"),
   state: z.string().min(2, "State is required"),
   pincode: z.string().min(6, "Pincode must be 6 digits").max(6),
-  contactPerson: z.string().min(2, "Contact person name is required"),
-  contactPhone: z.string().min(10, "Contact phone is required"),
-  contactEmail: z.string().email("Invalid contact email"),
-  bankAccountNumber: z.string().optional(),
-  bankIFSC: z.string().optional(),
-  bankName: z.string().optional(),
-  creditLimit: z.string().optional(),
   active: z.boolean(),
   notes: z.string().optional(),
 });
@@ -81,13 +74,6 @@ export default function EditDistributorPage() {
       city: "",
       state: "",
       pincode: "",
-      contactPerson: "",
-      contactPhone: "",
-      contactEmail: "",
-      bankAccountNumber: "",
-      bankIFSC: "",
-      bankName: "",
-      creditLimit: "0",
       active: true,
       notes: "",
     },
@@ -104,13 +90,6 @@ export default function EditDistributorPage() {
         city: distributor.city || "",
         state: distributor.state || "",
         pincode: distributor.pincode || "",
-        contactPerson: distributor.contactPerson || "",
-        contactPhone: distributor.contactPhone || "",
-        contactEmail: distributor.contactEmail || "",
-        bankAccountNumber: distributor.bankAccountNumber || "",
-        bankIFSC: distributor.bankIFSC || "",
-        bankName: distributor.bankName || "",
-        creditLimit: distributor.creditLimit?.toString() || "0",
         active: distributor.active ?? true,
         notes: distributor.notes || "",
       });
@@ -128,13 +107,6 @@ export default function EditDistributorPage() {
         city: data.city,
         state: data.state,
         pincode: data.pincode,
-        contactPerson: data.contactPerson,
-        contactPhone: data.contactPhone,
-        contactEmail: data.contactEmail,
-        bankAccountNumber: data.bankAccountNumber || null,
-        bankIFSC: data.bankIFSC || null,
-        bankName: data.bankName || null,
-        creditLimit: parseInt(data.creditLimit || "0"),
         active: data.active,
         notes: data.notes || null,
       });
@@ -356,141 +328,12 @@ export default function EditDistributorPage() {
               </CardContent>
             </Card>
 
-            {/* Contact Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Contact Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="contactPerson"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Contact Person *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Sales Manager" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="contactPhone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Contact Phone *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="9876543210" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="contactEmail"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Contact Email *</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="email"
-                            placeholder="contact@company.com"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Bank Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Bank Information (Optional)</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="bankName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Bank Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="HDFC Bank" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="bankAccountNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Account Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="1234567890" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="bankIFSC"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>IFSC Code</FormLabel>
-                        <FormControl>
-                          <Input placeholder="HDFC0001234" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Additional Settings */}
             <Card>
               <CardHeader>
                 <CardTitle>Additional Settings</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="creditLimit"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Credit Limit (₹)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="0"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Maximum credit allowed for this distributor
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <FormField
                   control={form.control}
                   name="active"

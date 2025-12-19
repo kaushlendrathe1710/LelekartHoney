@@ -92,6 +92,7 @@ import SellerWithdrawalsPage from "./pages/admin/seller-withdrawals";
 import AdminCustomInvoicePage from "./pages/admin/custom-invoice";
 import DistributorsPage from "./pages/admin/distributors";
 import CreateDistributorPage from "./pages/admin/create-distributor";
+import EditDistributorPage from "./pages/admin/edit-distributor";
 import DistributorDetailsPage from "./pages/admin/distributor-details";
 import DistributorApplicationsPage from "./pages/admin/distributor-applications";
 import DistributorDashboard from "./pages/distributor/dashboard";
@@ -711,6 +712,16 @@ function App() {
                             path="/admin/distributors/create"
                             role="admin"
                             component={CreateDistributorPage}
+                          />
+                        )}
+                      </Route>
+
+                      <Route path="/admin/distributors/:id/edit">
+                        {() => (
+                          <ProtectedRoute
+                            path="/admin/distributors/:id/edit"
+                            role="admin"
+                            component={EditDistributorPage}
                           />
                         )}
                       </Route>
