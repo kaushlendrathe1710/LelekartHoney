@@ -1913,7 +1913,7 @@ export default function CheckoutPage() {
                                   zipCode: selectedAddress.pincode,
                                   paymentMethod:
                                     form.getValues("paymentMethod"),
-                                    // || "cod",
+                                  // || "cod",
                                   notes: form.getValues("notes") || "",
                                 };
 
@@ -2227,8 +2227,7 @@ export default function CheckoutPage() {
                 <p className="text-sm text-gray-600">
                   {form.watch("paymentMethod") === "razorpay"
                     ? "Pay Online with Razorpay"
-                    : "Cash on Delivery (COD)"
-                    }
+                    : "Cash on Delivery (COD)"}
                 </p>
                 {/* {form.watch("paymentMethod") === "cod" && (
                   <p className="text-xs text-orange-700 mt-2">
