@@ -438,7 +438,14 @@ export default function RazorpayPayment({
           </p>
         </div> */}
       </CardContent>
-      <CardFooter>
+      <CardFooter className="flex flex-col">
+        <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-300 text-red-900 text-sm">
+          <strong>
+            WhatsApp confirmation required contact: +91-9877454036
+          </strong>
+          <br />
+          Orders without WhatsApp confirmation will not be shipped.
+        </div>
         <Button
           onClick={handlePayment}
           disabled={loading || !scriptLoaded || !razorpayKey}
