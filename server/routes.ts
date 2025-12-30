@@ -2260,7 +2260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="${invoiceNumber}.pdf"`
+        `attachment; filename="invoice-${invoiceNumber}.pdf"`
       );
 
       // Send PDF buffer

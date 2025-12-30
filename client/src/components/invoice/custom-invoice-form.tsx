@@ -234,9 +234,9 @@ export function CustomInvoiceForm() {
       const contentDisposition = response.headers.get("Content-Disposition");
       let filename = "invoice.pdf";
       if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
-        if (filenameMatch) {
-          filename = filenameMatch[1];
+        const match = contentDisposition.match(/filename="([^"]+)"/);
+        if (match && match[1]) {
+          filename = match[1];
         }
       }
 
