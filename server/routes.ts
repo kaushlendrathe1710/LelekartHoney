@@ -2015,7 +2015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Order created with ID:", newOrder.id);
 
       // Generate invoice number from order ID (consistent with order invoices)
-      const invoiceNumber = `INV-${newOrder.id}`;
+      const invoiceNumber = `${newOrder.id}`;
       const invoiceDate = newOrder.date;
 
       // Insert order items
