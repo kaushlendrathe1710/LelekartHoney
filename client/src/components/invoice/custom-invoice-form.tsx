@@ -18,21 +18,12 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Plus,
   Trash2,
   Download,
   FileText,
   Loader2,
   Building2,
-  Eye,
   Check,
   ChevronsUpDown,
 } from "lucide-react";
@@ -79,10 +70,6 @@ export function CustomInvoiceForm() {
   const [distributors, setDistributors] = useState<Distributor[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [loadingDistributors, setLoadingDistributors] = useState(true);
-  const [showPreview, setShowPreview] = useState(false);
-  const [previewHtml, setPreviewHtml] = useState("");
-  const [invoiceDataForDownload, setInvoiceDataForDownload] =
-    useState<any>(null);
   const [distributorOpen, setDistributorOpen] = useState(false);
   const [productOpen, setProductOpen] = useState<{ [key: number]: boolean }>(
     {}
@@ -198,17 +185,12 @@ export function CustomInvoiceForm() {
       }
 
       toast({
-        title: "Generating Preview",
-        description: "Your invoice preview is being generated...",
+        title: "Generating Invoice",
+        description: "Your invoice is being generated and downloaded...",
       });
 
-      // Generate a unique invoice number
-      const invoiceNumber = `INV-${Date.now()}`;
-
-      // Send item data with productId and quantity - backend will fetch price and GST from product table
+      // Send item data with productId and quantity - backend will create order and generate invoice
       const invoiceData = {
-        invoiceNumber,
-        invoiceDate: new Date().toISOString(),
         distributor: {
           id: distributor.id,
           companyName: distributor.companyName,
@@ -228,61 +210,13 @@ export function CustomInvoiceForm() {
         })),
       };
 
-      // Save invoice data for later download
-      setInvoiceDataForDownload(invoiceData);
-
-      // Send request to generate preview HTML
-      const response = await fetch("/api/invoices/preview-custom", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(invoiceData),
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to generate preview");
-      }
-
-      // Get HTML preview
-      const html = await response.text();
-      setPreviewHtml(html);
-      setShowPreview(true);
-
-      toast({
-        title: "Preview Ready",
-        description: "Review your invoice before downloading.",
-      });
-    } catch (error) {
-      console.error("Error generating preview:", error);
-      toast({
-        title: "Preview Failed",
-        description: "Failed to generate the preview. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleDownloadInvoice = async () => {
-    if (!invoiceDataForDownload) return;
-
-    setIsGenerating(true);
-    try {
-      toast({
-        title: "Generating PDF",
-        description: "Your invoice is being downloaded...",
-      });
-
-      // Send request to generate PDF
+      // Send request to generate invoice PDF (this will create the order first)
       const response = await fetch("/api/invoices/generate-custom", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(invoiceDataForDownload),
+        body: JSON.stringify(invoiceData),
         credentials: "include",
       });
 
@@ -295,13 +229,23 @@ export function CustomInvoiceForm() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${invoiceDataForDownload.invoiceNumber}.pdf`;
+
+      // Extract filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get("Content-Disposition");
+      let filename = "invoice.pdf";
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      setShowPreview(false);
       toast({
         title: "Invoice Generated!",
         description: "Your custom invoice has been downloaded successfully.",
@@ -545,52 +489,12 @@ export function CustomInvoiceForm() {
             </>
           ) : (
             <>
-              <Eye className="h-4 w-4 mr-2" />
-              Preview Invoice
+              <Download className="h-4 w-4 mr-2" />
+              Print Invoice
             </>
           )}
         </Button>
       </div>
-
-      {/* Preview Dialog */}
-      <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Invoice Preview</DialogTitle>
-            <DialogDescription>
-              Review your invoice before downloading. Click "Download PDF" to
-              save the invoice.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="border rounded-lg overflow-auto max-h-[60vh]">
-            <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
-          </div>
-
-          <DialogFooter className="flex justify-between gap-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowPreview(false)}
-              disabled={isGenerating}
-            >
-              Close
-            </Button>
-            <Button onClick={handleDownloadInvoice} disabled={isGenerating}>
-              {isGenerating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Downloading...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download PDF
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </form>
   );
 }
