@@ -1891,14 +1891,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const {
-        invoiceNumber,
-        invoiceDate,
         distributor,
         items, // Now contains only productId, productName, and quantity
       } = req.body;
 
-      console.log("Generating custom invoice:", invoiceNumber);
+      console.log("Generating custom invoice for distributor:", distributor.id);
       console.log("Items received:", items);
+
+      // Get the distributor's user account to create the order
+      const distributorRecord = await db
+        .select()
+        .from(distributors)
+        .where(eq(distributors.id, distributor.id))
+        .limit(1);
+
+      if (!distributorRecord.length) {
+        return res.status(404).json({ error: "Distributor not found" });
+      }
+
+      const distributorUserId = distributorRecord[0].userId;
 
       // Fetch product details from database for each item
       const itemsWithDetails = await Promise.all(
@@ -1968,24 +1979,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error("Invalid grand total calculated");
       }
 
-      // Get the distributor's user account to create the order
-      const distributorRecord = await db
-        .select()
-        .from(distributors)
-        .where(eq(distributors.id, distributor.id))
-        .limit(1);
-
-      if (!distributorRecord.length) {
-        return res.status(404).json({ error: "Distributor not found" });
-      }
-
-      const distributorUserId = distributorRecord[0].userId;
-
       // Get seller details
       const seller = await storage.getUser(req.user.id);
       if (!seller) {
         return res.status(404).json({ error: "Seller not found" });
       }
+
+      // Create shipping details for the order
+      const shippingDetails = {
+        name: distributor.name,
+        companyName: distributor.companyName,
+        email: distributor.email,
+        phone: distributor.phone,
+        address: distributor.address,
+        address2: "",
+        city: distributor.city,
+        state: distributor.state,
+        zipCode: distributor.pincode,
+        country: "India",
+      };
+
+      // Create the order first to get the order ID
+      const [newOrder] = await db
+        .insert(orders)
+        .values({
+          userId: distributorUserId,
+          status: "confirmed",
+          total: Math.round(grandTotal), // Convert to integer (paise/cents)
+          date: new Date(),
+          shippingDetails: JSON.stringify(shippingDetails),
+          paymentMethod: "custom_invoice",
+        })
+        .returning();
+
+      console.log("Order created with ID:", newOrder.id);
+
+      // Generate invoice number from order ID (consistent with order invoices)
+      const invoiceNumber = `INV-${newOrder.id}`;
+      const invoiceDate = newOrder.date;
+
+      // Insert order items
+      const orderItemsData = itemsWithDetails.map((item: any) => ({
+        orderId: newOrder.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        price: Math.round(item.price), // Convert to integer (paise/cents)
+        sellerId: req.user.id, // The admin/seller generating the invoice
+      }));
+
+      await db.insert(orderItems).values(orderItemsData);
+
+      // Update the order with the generated invoice number
+      await db
+        .update(orders)
+        .set({ orderId: invoiceNumber })
+        .where(eq(orders.id, newOrder.id));
+
+      // Get current balance from distributor ledger
+      const lastLedgerEntry = await db
+        .select()
+        .from(distributorLedger)
+        .where(eq(distributorLedger.distributorId, distributor.id))
+        .orderBy(desc(distributorLedger.id))
+        .limit(1);
+
+      const currentBalance = lastLedgerEntry.length
+        ? lastLedgerEntry[0].balanceAfter
+        : 0;
+      const newBalance = currentBalance + Math.round(grandTotal);
+
+      // Add ledger entry for this order using storage method to update distributor totals
+      await storage.addLedgerEntry({
+        distributorId: distributor.id,
+        entryType: "order",
+        amount: Math.round(grandTotal),
+        orderId: newOrder.id,
+        description: `Invoice ${invoiceNumber} - ${itemsWithDetails.length} item(s)`,
+        balanceAfter: newBalance,
+        createdBy: req.user.id,
+        notes: null,
+      });
+
+      console.log(
+        `Ledger updated for distributor ${distributor.id} with balance: ₹${
+          newBalance / 100
+        }`
+      );
 
       // Get seller business details
       let businessDetails = null;
@@ -2055,7 +2134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           date: new Date(invoiceDate),
           formattedDate: new Date(invoiceDate).toLocaleDateString("en-IN"),
           paymentMethod: "Custom",
-          orderNumber: invoiceNumber,
+          orderNumber: newOrder.id,
           shippingDetails: {
             address: distributor.address,
             address2: "",
@@ -2169,76 +2248,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       invoiceData.qrCodeDataUrl = qrCodeDataUrl;
-
-      // Create order on behalf of the distributor BEFORE generating PDF
-      const shippingDetails = {
-        name: distributor.name,
-        companyName: distributor.companyName,
-        email: distributor.email,
-        phone: distributor.phone,
-        address: distributor.address,
-        address2: "",
-        city: distributor.city,
-        state: distributor.state,
-        zipCode: distributor.pincode,
-        country: "India",
-      };
-
-      // Insert order
-      const [newOrder] = await db
-        .insert(orders)
-        .values({
-          userId: distributorUserId,
-          status: "confirmed",
-          total: Math.round(grandTotal), // Convert to integer (paise/cents)
-          date: new Date(invoiceDate),
-          shippingDetails: JSON.stringify(shippingDetails),
-          paymentMethod: "custom_invoice",
-          orderId: invoiceNumber,
-        })
-        .returning();
-
-      // Insert order items
-      const orderItemsData = itemsWithDetails.map((item: any) => ({
-        orderId: newOrder.id,
-        productId: item.productId,
-        quantity: item.quantity,
-        price: Math.round(item.price), // Convert to integer (paise/cents)
-        sellerId: req.user.id, // The admin/seller generating the invoice
-      }));
-
-      await db.insert(orderItems).values(orderItemsData);
-
-      // Get current balance from distributor ledger
-      const lastLedgerEntry = await db
-        .select()
-        .from(distributorLedger)
-        .where(eq(distributorLedger.distributorId, distributor.id))
-        .orderBy(desc(distributorLedger.id))
-        .limit(1);
-
-      const currentBalance = lastLedgerEntry.length
-        ? lastLedgerEntry[0].balanceAfter
-        : 0;
-      const newBalance = currentBalance + Math.round(grandTotal);
-
-      // Add ledger entry for this order using storage method to update distributor totals
-      await storage.addLedgerEntry({
-        distributorId: distributor.id,
-        entryType: "order",
-        amount: Math.round(grandTotal),
-        orderId: newOrder.id,
-        description: `Invoice ${invoiceNumber} - ${itemsWithDetails.length} item(s)`,
-        balanceAfter: newBalance,
-        createdBy: req.user.id,
-        notes: null,
-      });
-
-      console.log(
-        `Order ${newOrder.id} created for distributor ${
-          distributor.id
-        }, ledger updated with balance: ₹${newBalance / 100}`
-      );
 
       // Generate HTML using GST-compliant invoice template
       const invoiceHtml = await generateGstInvoiceHtml(invoiceData);
