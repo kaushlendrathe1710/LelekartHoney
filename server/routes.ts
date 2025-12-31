@@ -1764,7 +1764,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         order: {
           id: previewInvoiceNumber,
           date: new Date(previewInvoiceDate),
-          formattedDate: new Date(previewInvoiceDate).toLocaleDateString("en-IN"),
+          formattedDate: new Date(previewInvoiceDate).toLocaleDateString(
+            "en-IN"
+          ),
           paymentMethod: "Custom",
           orderNumber: previewInvoiceNumber,
           shippingDetails: {

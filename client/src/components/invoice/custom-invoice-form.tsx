@@ -322,7 +322,6 @@ export function CustomInvoiceForm() {
     await handlePreview(data);
   };
 
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <Card>
@@ -563,10 +562,11 @@ export function CustomInvoiceForm() {
           <DialogHeader>
             <DialogTitle>Invoice Preview</DialogTitle>
             <DialogDescription>
-              Review your invoice before generating the PDF. Order ID and Invoice Number will be automatically created upon generation.
+              Review your invoice before generating the PDF. Order ID and
+              Invoice Number will be automatically created upon generation.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="flex-1 overflow-auto border rounded-lg p-4 bg-white">
             <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
           </div>
@@ -579,10 +579,7 @@ export function CustomInvoiceForm() {
             >
               Cancel
             </Button>
-            <Button
-              onClick={handleGenerateFromPreview}
-              disabled={isGenerating}
-            >
+            <Button onClick={handleGenerateFromPreview} disabled={isGenerating}>
               {isGenerating ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
