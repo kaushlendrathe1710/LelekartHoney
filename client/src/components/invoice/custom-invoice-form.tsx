@@ -5,6 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -26,6 +34,7 @@ import {
   Building2,
   Check,
   ChevronsUpDown,
+  Eye,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -66,6 +75,10 @@ interface CustomInvoiceFormData {
 export function CustomInvoiceForm() {
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewData, setPreviewData] = useState<any>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [distributors, setDistributors] = useState<Distributor[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -171,8 +184,8 @@ export function CustomInvoiceForm() {
     return product ? `${product.name} - ₹${product.price}` : "Select a product";
   };
 
-  const onSubmit = async (data: CustomInvoiceFormData) => {
-    setIsGenerating(true);
+  const handlePreview = async (data: CustomInvoiceFormData) => {
+    setIsPreviewing(true);
 
     try {
       // Find selected distributor
@@ -184,12 +197,7 @@ export function CustomInvoiceForm() {
         throw new Error("Distributor not found");
       }
 
-      toast({
-        title: "Generating Invoice",
-        description: "Your invoice is being generated and downloaded...",
-      });
-
-      // Send item data with productId and quantity - backend will create order and generate invoice
+      // Prepare invoice data for preview
       const invoiceData = {
         distributor: {
           id: distributor.id,
@@ -210,13 +218,60 @@ export function CustomInvoiceForm() {
         })),
       };
 
+      // Call preview endpoint
+      const response = await fetch("/api/invoices/preview-custom", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(invoiceData),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate preview");
+      }
+
+      const html = await response.text();
+      setPreviewHtml(html);
+      setPreviewData(invoiceData);
+      setShowPreview(true);
+
+      toast({
+        title: "Preview Ready",
+        description: "Review your invoice before generating the PDF.",
+      });
+    } catch (error) {
+      console.error("Error generating preview:", error);
+      toast({
+        title: "Preview Failed",
+        description: "Failed to generate the preview. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPreviewing(false);
+    }
+  };
+
+  const handleGenerateFromPreview = async () => {
+    if (!previewData) return;
+
+    setIsGenerating(true);
+    setShowPreview(false);
+
+    try {
+      toast({
+        title: "Generating Invoice",
+        description: "Creating order and generating PDF...",
+      });
+
       // Send request to generate invoice PDF (this will create the order first)
       const response = await fetch("/api/invoices/generate-custom", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(invoiceData),
+        body: JSON.stringify(previewData),
         credentials: "include",
       });
 
@@ -261,6 +316,12 @@ export function CustomInvoiceForm() {
       setIsGenerating(false);
     }
   };
+
+  const onSubmit = async (data: CustomInvoiceFormData) => {
+    // When form is submitted, show the preview first
+    await handlePreview(data);
+  };
+
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -480,21 +541,63 @@ export function CustomInvoiceForm() {
         <Button
           type="submit"
           size="lg"
-          disabled={isGenerating || loadingProducts}
+          disabled={isPreviewing || loadingProducts}
         >
-          {isGenerating ? (
+          {isPreviewing ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Generating...
+              Generating Preview...
             </>
           ) : (
             <>
-              <Download className="h-4 w-4 mr-2" />
-              Print Invoice
+              <Eye className="h-4 w-4 mr-2" />
+              Preview Invoice
             </>
           )}
         </Button>
       </div>
+
+      {/* Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Invoice Preview</DialogTitle>
+            <DialogDescription>
+              Review your invoice before generating the PDF. Order ID and Invoice Number will be automatically created upon generation.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-auto border rounded-lg p-4 bg-white">
+            <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowPreview(false)}
+              disabled={isGenerating}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleGenerateFromPreview}
+              disabled={isGenerating}
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating PDF...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Generate & Download PDF
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }

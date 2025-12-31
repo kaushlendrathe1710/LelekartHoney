@@ -1664,7 +1664,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { invoiceNumber, invoiceDate, distributor, items } = req.body;
 
-      console.log("Generating custom invoice preview:", invoiceNumber);
+      // Use placeholder values if not provided (for preview mode)
+      const previewInvoiceNumber = invoiceNumber || "WILL BE AUTO-GENERATED";
+      const previewInvoiceDate = invoiceDate || new Date().toISOString();
+
+      console.log("Generating custom invoice preview:", previewInvoiceNumber);
 
       // Fetch product details from database for each item
       const itemsWithDetails = await Promise.all(
@@ -1751,18 +1755,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? distributor.companyName
           : distributor.name;
       const invoiceData = {
-        invoiceNumber,
-        invoiceDate: new Date(invoiceDate).toLocaleDateString("en-IN", {
+        invoiceNumber: previewInvoiceNumber,
+        invoiceDate: new Date(previewInvoiceDate).toLocaleDateString("en-IN", {
           year: "numeric",
           month: "long",
           day: "numeric",
         }),
         order: {
-          id: invoiceNumber,
-          date: new Date(invoiceDate),
-          formattedDate: new Date(invoiceDate).toLocaleDateString("en-IN"),
+          id: previewInvoiceNumber,
+          date: new Date(previewInvoiceDate),
+          formattedDate: new Date(previewInvoiceDate).toLocaleDateString("en-IN"),
           paymentMethod: "Custom",
-          orderNumber: invoiceNumber,
+          orderNumber: previewInvoiceNumber,
           shippingDetails: {
             address: distributor.address,
             address2: "",
@@ -1860,7 +1864,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Generate QR code
-      const qrData = `Invoice: ${invoiceNumber}\nAmount: ₹${grandTotal}\nDate: ${invoiceData.invoiceDate}`;
+      const qrData = `Invoice: ${previewInvoiceNumber}\nAmount: ₹${grandTotal}\nDate: ${invoiceData.invoiceDate}`;
       const qrCodeDataUrl = await QRCode.toDataURL(qrData, {
         errorCorrectionLevel: "H",
         margin: 1,
