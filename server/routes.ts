@@ -20,6 +20,7 @@ import * as XLSX from "xlsx";
 import templateService from "./services/template-service";
 import * as pdfGenerator from "./services/pdf-generator"; // Import PDF generator service
 import {
+  formatOrderNumber,
   getShippingLabelTemplate,
   generateInvoiceHtml as generateGstInvoiceHtml,
 } from "./services/pdf-generator"; // Import shipping label template and GST invoice generator
@@ -1112,8 +1113,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Use static seller address instead of dynamic addresses
           const STATIC_SELLER_ADDRESS = {
-            businessName: "Kaushal Ranjeet pvt. ltd.",
-            line1: "Building no 2072, Chandigarh Royale City",
+            businessName: "Kaushal Ranjeet Pvt. Ltd.",
+            line1: "Building No 2072, Chandigarh Royale City",
             line2: "Bollywood Gully",
             city: "Banur",
             state: "Punjab",
@@ -1261,7 +1262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             order: {
               ...order,
               id: orderId,
-              orderNumber: orderId,
+              orderNumber: formatOrderNumber(orderId),
               formattedDate,
               formattedStatus:
                 order.status.charAt(0).toUpperCase() + order.status.slice(1),
@@ -1734,8 +1735,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Static seller address
       const STATIC_SELLER_ADDRESS = {
-        businessName: "Kaushal Ranjeet pvt. ltd.",
-        line1: "Building no 2072, Chandigarh Royale City",
+        businessName: "Kaushal Ranjeet Pvt. Ltd.",
+        line1: "Building No 2072, Chandigarh Royale City",
         line2: "Bollywood Gully",
         city: "Banur",
         state: "Punjab",
@@ -2103,8 +2104,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Static seller address as per invoice template
       const STATIC_SELLER_ADDRESS = {
-        businessName: "Kaushal Ranjeet pvt. ltd.",
-        line1: "Building no 2072, Chandigarh Royale City",
+        businessName: "Kaushal Ranjeet Pvt. Ltd.",
+        line1: "Building No 2072, Chandigarh Royale City",
         line2: "Bollywood Gully",
         city: "Banur",
         state: "Punjab",
@@ -2140,7 +2141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           date: new Date(invoiceDate),
           formattedDate: new Date(invoiceDate).toLocaleDateString("en-IN"),
           paymentMethod: "Custom",
-          orderNumber: newOrder.id,
+          orderNumber: formatOrderNumber(newOrder.id),
           shippingDetails: {
             address: distributor.address,
             address2: "",
@@ -15411,8 +15412,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       <div class="bill-from">
         <div class="bold">Bill From</div>
         <br>
-        <div class="bold">Kaushal Ranjeet pvt. ltd.</div>
-        <div>Building no 2072, Chandigarh Royale City</div>
+        <div class="bold">Kaushal Ranjeet Pvt. Ltd.</div>
+        <div>Building No 2072, Chandigarh Royale City</div>
         <div>Bollywood Gully</div>
         <div>Banur SAS Nagar</div>
         <div>140601</div>
@@ -15421,8 +15422,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       <div class="ship-from">
         <div class="bold">Ship From</div>
         <br>
-        <div class="bold">Kaushal Ranjeet pvt. ltd.</div>
-        <div>Building no 2072, Chandigarh Royale City</div>
+        <div class="bold">Kaushal Ranjeet Pvt. Ltd.</div>
+        <div>Building No 2072, Chandigarh Royale City</div>
         <div>Bollywood Gully</div>
         <div>Banur SAS Nagar</div>
         <div>140601</div>

@@ -174,9 +174,9 @@ export default function ContactUsPage() {
                             titleFilter="Corporate Address"
                             defaultContent={
                               <p className="text-sm md:text-base text-gray-600">
-                                Kaushal Ranjeet Pvt Ltd,
+                                Kaushal Ranjeet Pvt. Ltd.,
                                 <br />
-                                Building no 2072, Chandigarh Royale City
+                                Building No 2072, Chandigarh Royale City
                                 <br />
                                 Bollywood Gully
                                 <br />
