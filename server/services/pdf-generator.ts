@@ -1603,7 +1603,7 @@ export async function generateInvoiceHtml(data: any): Promise<string> {
           </tr>
           <tr>
             <td class="label-col bold">Invoice No:</td>
-            <td class="value-col">PPH-{{order.id}}</td>
+            <td class="value-col">PPH{{order.orderNumber}}</td>
           </tr>
           <tr>
             <td class="label-col bold">Order No:</td>
@@ -1654,8 +1654,8 @@ export async function generateInvoiceHtml(data: any): Promise<string> {
       <div class="bill-from">
         <div class="bold">Bill From</div>
         <br>
-        <div class="bold">Kaushal Ranjeet pvt. ltd.</div>
-        <div>Building no 2072, Chandigarh Royale City</div>
+        <div class="bold">Kaushal Ranjeet Pvt. Ltd.</div>
+        <div>Building No 2072, Chandigarh Royale City</div>
         <div>Bollywood Gully</div>
         <div>Banur SAS Nagar</div>
         <div>140601</div>
@@ -1664,8 +1664,8 @@ export async function generateInvoiceHtml(data: any): Promise<string> {
       <div class="ship-from">
         <div class="bold">Ship From</div>
         <br>
-        <div class="bold">Kaushal Ranjeet pvt. ltd.</div>
-        <div>Building no 2072, Chandigarh Royale City</div>
+        <div class="bold">Kaushal Ranjeet Pvt. Ltd.</div>
+        <div>Building No 2072, Chandigarh Royale City</div>
         <div>Bollywood Gully</div>
         <div>Banur SAS Nagar</div>
         <div>140601</div>
@@ -1844,3 +1844,8 @@ function getTaxInvoiceTemplate(): string {
   // This is now just a placeholder - actual generation happens in generateInvoiceHtml
   return "";
 }
+
+export function formatOrderNumber(orderId: number, length = 4) {
+  return orderId.toString().padStart(length, "0");
+}
+
